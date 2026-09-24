@@ -442,9 +442,9 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {model.answerKeys.list.map((ak, akIdx) => (
-                    <tr key={`ak-${ak.itemNumber ?? akIdx}`} className="hover:bg-slate-50/50">
+                    <tr key={`answer-key-${akIdx}`} className="hover:bg-slate-50/50">
                       <td className="p-2 text-center font-semibold text-slate-600">
-                        {ak.itemNumber ?? akIdx + 1}
+                        {ak.itemNumber ?? '-'}
                       </td>
                       <td className="p-2 text-slate-700 font-medium">{ak.instrumentType}</td>
                       <td className="p-2 text-slate-700">{ak.answerType}</td>

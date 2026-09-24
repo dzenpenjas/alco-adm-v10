@@ -34,6 +34,8 @@ import {
   K13Analysis,
   AssessmentCriterion,
   AssessmentPlan,
+  WrittenAssessmentInstrument,
+  OralAssessmentInstrument,
 } from '../../types';
 import { DocumentGenerationContext } from './types';
 import {
@@ -701,8 +703,19 @@ export function buildNormalizedAssessmentDocumentModel(
           (inst) => inst.id === ak.instrumentId
         );
 
+        let linkedItemOrder: number | undefined;
+        if (linkedInstrument?.type === 'WRITTEN_TEST') {
+          linkedItemOrder = (linkedInstrument as WrittenAssessmentInstrument).items?.find(
+            (item) => item.id === ak.instrumentItemId
+          )?.order;
+        } else if (linkedInstrument?.type === 'ORAL_TEST') {
+          linkedItemOrder = (linkedInstrument as OralAssessmentInstrument).items?.find(
+            (item) => item.id === ak.instrumentItemId
+          )?.order;
+        }
+
         return {
-          itemNumber: idx + 1,
+          itemNumber: linkedItemOrder,
           instrumentType: linkedInstrument?.type ?? '-',
           answerType: ak.answerType,
           value: valueStr,
@@ -1565,7 +1578,7 @@ export async function renderAssessmentDocx(
         (ak) =>
           new TableRow({
             children: [
-              createAssessmentTableDataCell(String(ak.itemNumber || '-'), 10, AlignmentType.CENTER),
+              createAssessmentTableDataCell(String(ak.itemNumber ?? '-'), 10, AlignmentType.CENTER),
               createAssessmentTableDataCell(ak.instrumentType, 20, AlignmentType.CENTER),
               createAssessmentTableDataCell(ak.answerType, 20, AlignmentType.CENTER),
               createAssessmentTableDataCell(ak.value || '-', 30, AlignmentType.LEFT, true),
@@ -1973,7 +1986,7 @@ export function renderAssessmentPdf(model: NormalizedAssessmentDocument): Blob {
         { header: 'Keterangan', dataKey: 'notes', width: 20, align: 'left' },
       ],
       rows: model.answerKeys.list.map((ak) => [
-        ak.itemNumber || '-',
+        ak.itemNumber ?? '-',
         ak.instrumentType,
         ak.answerType,
         ak.value || '-',
