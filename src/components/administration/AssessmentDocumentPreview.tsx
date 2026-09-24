@@ -389,6 +389,11 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
                         <span className="font-semibold">Petunjuk:</span> {inst.instructions}
                       </div>
                     )}
+                    {inst.responseScheme && (
+                      <div className="text-xs text-slate-600">
+                        <span className="font-semibold">Skema Respon:</span> {inst.responseScheme}
+                      </div>
+                    )}
                     {inst.selfPeerItems && inst.selfPeerItems.length > 0 ? (
                       <div className="space-y-1.5">
                         <span className="text-xs font-bold text-slate-700 block">Daftar Pernyataan Refleksi / Penilaian:</span>
@@ -429,7 +434,8 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
                 <thead>
                   <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
                     <th className="p-2 w-16 text-center">No. Butir</th>
-                    <th className="p-2 w-36">Tipe Kunci</th>
+                    <th className="p-2 w-32">Instrumen</th>
+                    <th className="p-2 w-32">Tipe Kunci</th>
                     <th className="p-2">Kunci Jawaban</th>
                     <th className="p-2">Keterangan</th>
                   </tr>
@@ -440,6 +446,7 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
                       <td className="p-2 text-center font-semibold text-slate-600">
                         {ak.itemNumber ?? akIdx + 1}
                       </td>
+                      <td className="p-2 text-slate-700 font-medium">{ak.instrumentType}</td>
                       <td className="p-2 text-slate-700">{ak.answerType}</td>
                       <td className="p-2 font-semibold text-blue-700">{ak.value || '-'}</td>
                       <td className="p-2 text-slate-600">{ak.notes || '-'}</td>

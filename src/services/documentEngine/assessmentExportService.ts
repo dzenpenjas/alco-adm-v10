@@ -665,6 +665,7 @@ export function buildNormalizedAssessmentDocumentModel(
           }
           case 'SELF_ASSESSMENT':
           case 'PEER_ASSESSMENT': {
+            base.responseScheme = inst.responseScheme;
             base.selfPeerItems = (inst.items || []).map((item, idx) => ({
               no: idx + 1,
               statement: item.statement,
@@ -696,9 +697,13 @@ export function buildNormalizedAssessmentDocumentModel(
             .join('; ');
         }
 
+        const linkedInstrument = snapshot.instruments.find(
+          (inst) => inst.id === ak.instrumentId
+        );
+
         return {
           itemNumber: idx + 1,
-          instrumentType: 'WRITTEN_TEST',
+          instrumentType: linkedInstrument?.type ?? '-',
           answerType: ak.answerType,
           value: valueStr,
           notes: ak.notes,
@@ -1492,27 +1497,51 @@ export async function renderAssessmentDocx(
             spacing: { before: 40, after: 20 },
           })
         );
+        if (it.expectedResponse) {
+          docChildren.push(
+            new Paragraph({
+              indent: { left: 360 },
+              children: [
+                new TextRun({
+                  text: `Respons yang Diharapkan: ${it.expectedResponse}`,
+                  size: FONT_SIZE_DOCX_BODY,
+                  font: ASSESSMENT_DOCX_FONT,
+                  color: ASSESSMENT_DOCX_BLACK,
+                  italics: true,
+                }),
+              ],
+              spacing: { before: 20, after: 40 },
+            })
+          );
+        }
       });
     } else if (
-      (inst.type === 'SELF_ASSESSMENT' || inst.type === 'PEER_ASSESSMENT') &&
-      inst.selfPeerItems
+      inst.type === 'SELF_ASSESSMENT' ||
+      inst.type === 'PEER_ASSESSMENT'
     ) {
-      inst.selfPeerItems.forEach((it) => {
-        const text = it.category ? `${it.no}. ${it.statement} — ${it.category}` : `${it.no}. ${it.statement}`;
+      if (inst.responseScheme) {
         docChildren.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text,
-                size: FONT_SIZE_DOCX_BODY,
-                font: ASSESSMENT_DOCX_FONT,
-                color: ASSESSMENT_DOCX_BLACK,
-              }),
-            ],
-            spacing: { before: 40, after: 20 },
-          })
+          createAssessmentNarrativeParagraph(`Skema Respon: ${inst.responseScheme}`)
         );
-      });
+      }
+      if (inst.selfPeerItems) {
+        inst.selfPeerItems.forEach((it) => {
+          const text = it.category ? `${it.no}. ${it.statement} — ${it.category}` : `${it.no}. ${it.statement}`;
+          docChildren.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text,
+                  size: FONT_SIZE_DOCX_BODY,
+                  font: ASSESSMENT_DOCX_FONT,
+                  color: ASSESSMENT_DOCX_BLACK,
+                }),
+              ],
+              spacing: { before: 40, after: 20 },
+            })
+          );
+        });
+      }
     }
 
     docChildren.push(new Paragraph({ spacing: { after: 120 } }));
@@ -1525,20 +1554,22 @@ export async function renderAssessmentDocx(
     const akRows = [
       new TableRow({
         children: [
-          createAssessmentTableHeaderCell('No. Butir', 12),
-          createAssessmentTableHeaderCell('Tipe Kunci', 25),
-          createAssessmentTableHeaderCell('Kunci Jawaban', 40, AlignmentType.LEFT),
-          createAssessmentTableHeaderCell('Keterangan / Penjelasan', 23, AlignmentType.LEFT),
+          createAssessmentTableHeaderCell('No. Butir', 10),
+          createAssessmentTableHeaderCell('Instrumen', 20),
+          createAssessmentTableHeaderCell('Tipe Kunci', 20),
+          createAssessmentTableHeaderCell('Kunci Jawaban', 30, AlignmentType.LEFT),
+          createAssessmentTableHeaderCell('Keterangan / Penjelasan', 20, AlignmentType.LEFT),
         ],
       }),
       ...model.answerKeys.list.map(
         (ak) =>
           new TableRow({
             children: [
-              createAssessmentTableDataCell(String(ak.itemNumber || '-'), 12, AlignmentType.CENTER),
-              createAssessmentTableDataCell(ak.answerType, 25, AlignmentType.CENTER),
-              createAssessmentTableDataCell(ak.value || '-', 40, AlignmentType.LEFT, true),
-              createAssessmentTableDataCell(ak.notes || '-', 23),
+              createAssessmentTableDataCell(String(ak.itemNumber || '-'), 10, AlignmentType.CENTER),
+              createAssessmentTableDataCell(ak.instrumentType, 20, AlignmentType.CENTER),
+              createAssessmentTableDataCell(ak.answerType, 20, AlignmentType.CENTER),
+              createAssessmentTableDataCell(ak.value || '-', 30, AlignmentType.LEFT, true),
+              createAssessmentTableDataCell(ak.notes || '-', 20),
             ],
           })
       ),
@@ -1575,6 +1606,11 @@ export async function renderAssessmentDocx(
       if (sg.instructions) {
         docChildren.push(
           createAssessmentNarrativeParagraph(sg.instructions)
+        );
+      }
+      if (sg.notes) {
+        docChildren.push(
+          createAssessmentNarrativeParagraph(`Catatan: ${sg.notes}`)
         );
       }
     });
@@ -1885,21 +1921,37 @@ export function renderAssessmentPdf(model: NormalizedAssessmentDocument): Blob {
           type: 'paragraph',
           text: `${it.no}. ${it.prompt}`,
           bold: true,
-          spacingAfter: 2,
+          spacingAfter: it.expectedResponse ? 1 : 2,
         });
+        if (it.expectedResponse) {
+          sections.push({
+            type: 'paragraph',
+            text: `Respons yang Diharapkan: ${it.expectedResponse}`,
+            spacingAfter: 2,
+          });
+        }
       });
     } else if (
-      (inst.type === 'SELF_ASSESSMENT' || inst.type === 'PEER_ASSESSMENT') &&
-      inst.selfPeerItems
+      inst.type === 'SELF_ASSESSMENT' ||
+      inst.type === 'PEER_ASSESSMENT'
     ) {
-      inst.selfPeerItems.forEach((it) => {
-        const text = it.category ? `${it.no}. ${it.statement} — ${it.category}` : `${it.no}. ${it.statement}`;
+      if (inst.responseScheme) {
         sections.push({
           type: 'paragraph',
-          text,
+          text: `Skema Respon: ${inst.responseScheme}`,
           spacingAfter: 2,
         });
-      });
+      }
+      if (inst.selfPeerItems) {
+        inst.selfPeerItems.forEach((it) => {
+          const text = it.category ? `${it.no}. ${it.statement} — ${it.category}` : `${it.no}. ${it.statement}`;
+          sections.push({
+            type: 'paragraph',
+            text,
+            spacingAfter: 2,
+          });
+        });
+      }
     }
   });
 
@@ -1914,13 +1966,15 @@ export function renderAssessmentPdf(model: NormalizedAssessmentDocument): Blob {
     sections.push({
       type: 'table',
       columns: [
-        { header: 'No. Butir', dataKey: 'itemNumber', width: 15, align: 'center' },
-        { header: 'Tipe Kunci', dataKey: 'answerType', width: 25, align: 'center' },
-        { header: 'Kunci Jawaban', dataKey: 'value', width: 35, align: 'left' },
-        { header: 'Keterangan', dataKey: 'notes', width: 25, align: 'left' },
+        { header: 'No. Butir', dataKey: 'itemNumber', width: 10, align: 'center' },
+        { header: 'Instrumen', dataKey: 'instrumentType', width: 20, align: 'center' },
+        { header: 'Tipe Kunci', dataKey: 'answerType', width: 20, align: 'center' },
+        { header: 'Kunci Jawaban', dataKey: 'value', width: 30, align: 'left' },
+        { header: 'Keterangan', dataKey: 'notes', width: 20, align: 'left' },
       ],
       rows: model.answerKeys.list.map((ak) => [
         ak.itemNumber || '-',
+        ak.instrumentType,
         ak.answerType,
         ak.value || '-',
         ak.notes || '-',
@@ -1948,6 +2002,13 @@ export function renderAssessmentPdf(model: NormalizedAssessmentDocument): Blob {
           type: 'paragraph',
           text: sg.instructions,
           align: 'justify',
+          spacingAfter: 2,
+        });
+      }
+      if (sg.notes) {
+        sections.push({
+          type: 'paragraph',
+          text: `Catatan: ${sg.notes}`,
           spacingAfter: 2,
         });
       }

@@ -112,6 +112,7 @@ export interface NormalizedAssessmentInstrument {
   evidenceRequirements?: string[];
   observationAspects?: { label: string; indicator?: string }[];
   recordingScheme?: string;
+  responseScheme?: string;
   selfPeerItems?: { no: number; statement: string; category?: string }[];
 }
 
