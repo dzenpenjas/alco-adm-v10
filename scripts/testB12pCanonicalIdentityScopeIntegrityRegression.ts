@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { validateAssessmentPackage } from '../src/services/assessmentPackageService';
 import type {
   AssessmentPackage,
@@ -128,7 +130,7 @@ function createValidPackage(): AssessmentPackage {
     id: 'rub-1',
     title: 'Rubrik Tes Tertulis',
     criteria: [{ id: 'crit-1', label: 'Keakuratan Pemahaman' }],
-    scale: [{ id: 'sc-1', label: 'Sangat Baik', minScore: 4, maxScore: 4 }],
+    scale: [{ id: 'sc-1', label: 'Sangat Baik', score: 4, order: 1 }],
     instrumentId: instId,
     instrumentItemId: essayItemId,
   };
@@ -293,7 +295,7 @@ console.log('=== B.1.2p Canonical ID, Reference & Scope Integrity Regression Tes
     id: 'rub-1', // duplicate!
     title: 'Rubrik Kedua',
     criteria: [{ id: 'c-2', label: 'Kriteria 2' }],
-    scale: [{ id: 's-2', label: 'Baik' }],
+    scale: [{ id: 's-2', label: 'Baik', order: 1 }],
   });
   const res = validateAssessmentPackage(pkg, mockContext);
   assert(!res.valid, 'Test 8: Duplicate Rubric ID fails validation');
@@ -406,6 +408,28 @@ console.log('=== B.1.2p Canonical ID, Reference & Scope Integrity Regression Tes
     res.errors.some((e) => e.includes('workspaceId Perangkat Asesmen')),
     'Test 17: Contains workspaceId mismatch error message'
   );
+}
+
+// Test 18: Zero type escapes enforced
+{
+  const servicePath = path.resolve(process.cwd(), 'src/services/assessmentPackageService.ts');
+  const testPath = path.resolve(process.cwd(), 'scripts/testB12pCanonicalIdentityScopeIntegrityRegression.ts');
+  
+  const serviceCode = fs.readFileSync(servicePath, 'utf8');
+  const testCode = fs.readFileSync(testPath, 'utf8');
+
+  const forbidden = [
+    'as ' + 'any',
+    'as ' + 'unknown ' + 'as',
+    '@ts-' + 'ignore',
+    '@ts-' + 'expect-error',
+  ];
+  
+  const hasServiceEscapes = forbidden.some((pat) => serviceCode.includes(pat));
+  const hasTestEscapes = forbidden.some((pat) => testCode.includes(pat));
+
+  assert(!hasServiceEscapes, 'Test 18: Zero type escapes in assessmentPackageService.ts');
+  assert(!hasTestEscapes, 'Test 18: Zero type escapes in B.1.2p test script');
 }
 
 console.log(`\nResults: ${passed} passed, ${failed} failed.`);
