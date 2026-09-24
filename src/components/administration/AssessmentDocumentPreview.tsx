@@ -176,9 +176,16 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
                               {item.stimulus}
                             </div>
                           )}
-                          <div className="flex items-start gap-2">
-                            <span className="font-bold text-xs text-slate-700">{item.no}.</span>
-                            <div className="text-xs text-slate-800 flex-1">{item.prompt}</div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2 flex-1">
+                              <span className="font-bold text-xs text-slate-700">{item.no}.</span>
+                              <div className="text-xs text-slate-800 flex-1">{item.prompt}</div>
+                            </div>
+                            {item.itemType && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 shrink-0">
+                                {item.itemType}
+                              </span>
+                            )}
                           </div>
                           {item.options && item.options.length > 0 && (
                             <div className="pl-6 space-y-1">

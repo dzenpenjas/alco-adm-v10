@@ -124,10 +124,11 @@ function runTests() {
   // ----------------------------------------------------
   // TEST 8 — CANONICAL WRITTEN FIELDS
   // ----------------------------------------------------
-  test('TEST 8: Written items use canonical fields (item.no, prompt, stimulus, opt.label, opt.text)', () => {
+  test('TEST 8: Written items use canonical fields (item.no, prompt, stimulus, item.itemType, opt.label, opt.text)', () => {
     assert.ok(previewContent.includes('item.no'), 'must use item.no');
     assert.ok(previewContent.includes('item.prompt'), 'must use item.prompt');
     assert.ok(previewContent.includes('item.stimulus'), 'must use item.stimulus');
+    assert.ok(previewContent.includes('item.itemType'), 'must use item.itemType');
     assert.ok(previewContent.includes('opt.label'), 'must use opt.label');
     assert.ok(previewContent.includes('opt.text'), 'must use opt.text');
   });
@@ -304,7 +305,7 @@ function runTests() {
         teacherName: 'Guru Penjas',
         formattedDocumentDate: '23 September 2026',
         isBlankMode: false,
-        mode: 'CANONICAL',
+        mode: 'CANONICAL_PACKAGE',
       },
       kisiKisi: {
         title: 'Kisi-Kisi Asesmen',
