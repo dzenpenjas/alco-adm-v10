@@ -524,9 +524,6 @@ export function sanitizeAssessmentVisibleTitle(
     .replace(barePatternReverse, '')
     .trim();
 
-  // If there's a trailing dangling hyphen/colon after removal, strip it
-  sanitized = sanitized.replace(/\s*[-—–/|:]\s*$/, '').trim();
-
   return sanitized || value;
 }
 

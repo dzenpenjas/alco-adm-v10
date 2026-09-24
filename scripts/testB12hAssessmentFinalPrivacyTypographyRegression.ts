@@ -613,6 +613,66 @@ function runTests() {
     );
   });
 
+  // ----------------------------------------------------
+  // TEST 22 — COLON PRESERVED
+  // ----------------------------------------------------
+  test('TEST 22: Terminal colon in visible title is preserved', () => {
+    assert.strictEqual(
+      sanitizeAssessmentVisibleTitle('Instrumen Praktik:'),
+      'Instrumen Praktik:'
+    );
+  });
+
+  // ----------------------------------------------------
+  // TEST 23 — HYPHEN PRESERVED
+  // ----------------------------------------------------
+  test('TEST 23: Terminal hyphen in visible title is preserved', () => {
+    assert.strictEqual(
+      sanitizeAssessmentVisibleTitle('Bab 1 -'),
+      'Bab 1 -'
+    );
+  });
+
+  // ----------------------------------------------------
+  // TEST 24 — SLASH PRESERVED
+  // ----------------------------------------------------
+  test('TEST 24: Terminal slash in visible title is preserved', () => {
+    assert.strictEqual(
+      sanitizeAssessmentVisibleTitle('Rubrik /'),
+      'Rubrik /'
+    );
+  });
+
+  // ----------------------------------------------------
+  // TEST 25 — PIPE PRESERVED
+  // ----------------------------------------------------
+  test('TEST 25: Terminal pipe in visible title is preserved', () => {
+    assert.strictEqual(
+      sanitizeAssessmentVisibleTitle('Instrumen |'),
+      'Instrumen |'
+    );
+  });
+
+  // ----------------------------------------------------
+  // TEST 26 — AI MARKER WITH DELIMITER STILL CLEAN
+  // ----------------------------------------------------
+  test('TEST 26: AI draft marker with delimiter is still properly cleaned', () => {
+    assert.strictEqual(
+      sanitizeAssessmentVisibleTitle('Pedoman Penskoran - AI Draft'),
+      'Pedoman Penskoran'
+    );
+  });
+
+  // ----------------------------------------------------
+  // TEST 27 — BARE AI MARKER STILL CLEAN
+  // ----------------------------------------------------
+  test('TEST 27: Bare AI draft marker is still properly cleaned', () => {
+    assert.strictEqual(
+      sanitizeAssessmentVisibleTitle('Pedoman Penskoran AI-Draft'),
+      'Pedoman Penskoran'
+    );
+  });
+
   console.log(`\nRegression results: ${passed} passed, ${failed} failed.`);
   if (failed > 0) {
     process.exit(1);
