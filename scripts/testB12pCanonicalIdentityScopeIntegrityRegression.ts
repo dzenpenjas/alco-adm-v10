@@ -1,10 +1,13 @@
 import fs from 'fs';
 import path from 'path';
-import { validateAssessmentPackage } from '../src/services/assessmentPackageService';
+import { validateAssessmentPackage, invalidateAssessmentPackageDependencies } from '../src/services/assessmentPackageService';
 import type {
   AssessmentPackage,
   WrittenAssessmentInstrument,
   OralAssessmentInstrument,
+  PerformanceAssessmentInstrument,
+  ObservationAssessmentInstrument,
+  SelfPeerAssessmentInstrument,
   AcademicSetting,
   AssessmentPlan,
   TPData,
@@ -430,6 +433,404 @@ console.log('=== B.1.2p Canonical ID, Reference & Scope Integrity Regression Tes
 
   assert(!hasServiceEscapes, 'Test 18: Zero type escapes in assessmentPackageService.ts');
   assert(!hasTestEscapes, 'Test 18: Zero type escapes in B.1.2p test script');
+}
+
+// Test 19: invalidateAssessmentPackageDependencies passes on valid package
+{
+  const pkg = createValidPackage();
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(!res.isInvalidated, 'Test 19: Invalidation passes on valid package');
+  assert(res.reasons.length === 0, `Test 19: 0 reasons expected, got ${res.reasons.length}: ${res.reasons.join('; ')}`);
+}
+
+// Test 20: invalidateAssessmentPackageDependencies fails on duplicate instrument ID
+{
+  const pkg = createValidPackage();
+  pkg.instruments.push({
+    id: 'inst-written-1', // duplicate!
+    type: 'ORAL_TEST',
+    title: 'Tes Lisan',
+  } as OralAssessmentInstrument);
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 20: Duplicate instrument ID invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('Duplicate instrument ID')),
+    'Test 20: Contains duplicate instrument ID reason'
+  );
+}
+
+// Test 21: invalidateAssessmentPackageDependencies fails on empty instrument ID
+{
+  const pkg = createValidPackage();
+  pkg.instruments[0].id = '';
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 21: Empty instrument ID invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('tanpa id canonical')),
+    'Test 21: Contains empty instrument ID reason'
+  );
+}
+
+// Test 22: invalidateAssessmentPackageDependencies fails on duplicate item ID across instruments
+{
+  const pkg = createValidPackage();
+  const oralInst: OralAssessmentInstrument = {
+    id: 'inst-oral-1',
+    type: 'ORAL_TEST',
+    title: 'Tes Lisan Utama',
+    items: [
+      {
+        id: 'item-mc-1', // duplicate item ID!
+        prompt: 'Pertanyaan lisan?',
+        order: 1,
+      },
+    ],
+  };
+  pkg.instruments.push(oralInst);
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 22: Duplicate item ID across instruments invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('Duplicate instrument item ID')),
+    'Test 22: Contains duplicate item ID reason'
+  );
+}
+
+// Test 23: invalidateAssessmentPackageDependencies fails on empty item ID
+{
+  const pkg = createValidPackage();
+  (pkg.instruments[0] as WrittenAssessmentInstrument).items![0].id = '';
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 23: Empty item ID invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('tanpa id canonical')),
+    'Test 23: Contains empty item ID reason'
+  );
+}
+
+// Test 24: invalidateAssessmentPackageDependencies fails on duplicate item ID in WRITTEN_TEST
+{
+  const pkg = createValidPackage();
+  const writtenInst = pkg.instruments[0] as WrittenAssessmentInstrument;
+  writtenInst.items!.push({
+    id: 'item-mc-1', // duplicate in same written instrument!
+    itemType: 'SHORT_ANSWER',
+    prompt: 'Soal isian duplikat',
+    order: 3,
+  });
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 24: Duplicate item ID in same written test invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('Duplicate instrument item ID')),
+    'Test 24: Contains duplicate item ID reason'
+  );
+}
+
+// Test 25: invalidateAssessmentPackageDependencies fails on duplicate aspect ID in PERFORMANCE
+{
+  const pkg = createValidPackage();
+  const perfInst: PerformanceAssessmentInstrument = {
+    id: 'inst-perf-1',
+    type: 'PERFORMANCE',
+    title: 'Unjuk Kerja',
+    task: 'Praktik Basket',
+    aspects: [
+      { id: 'item-mc-1', label: 'Aspek 1' }, // duplicate ID with mc item!
+    ],
+  };
+  pkg.instruments.push(perfInst);
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 25: Duplicate aspect ID in PERFORMANCE invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('Duplicate instrument item ID')),
+    'Test 25: Contains duplicate aspect ID reason'
+  );
+}
+
+// Test 26: invalidateAssessmentPackageDependencies fails on duplicate aspect ID in OBSERVATION
+{
+  const pkg = createValidPackage();
+  const obsInst: ObservationAssessmentInstrument = {
+    id: 'inst-obs-1',
+    type: 'OBSERVATION',
+    title: 'Lembar Observasi',
+    aspects: [
+      { id: 'item-mc-1', label: 'Aspek Obs' }, // duplicate ID!
+    ],
+  };
+  pkg.instruments.push(obsInst);
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 26: Duplicate aspect ID in OBSERVATION invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('Duplicate instrument item ID')),
+    'Test 26: Contains duplicate aspect ID reason'
+  );
+}
+
+// Test 27: invalidateAssessmentPackageDependencies fails on duplicate item ID in SELF_ASSESSMENT
+{
+  const pkg = createValidPackage();
+  const selfInst: SelfPeerAssessmentInstrument = {
+    id: 'inst-self-1',
+    type: 'SELF_ASSESSMENT',
+    title: 'Penilaian Diri',
+    items: [
+      { id: 'item-mc-1', statement: 'Pernyataan Diri' }, // duplicate ID!
+    ],
+  };
+  pkg.instruments.push(selfInst);
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 27: Duplicate item ID in SELF_ASSESSMENT invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('Duplicate instrument item ID')),
+    'Test 27: Contains duplicate item ID reason'
+  );
+}
+
+// Test 28: invalidateAssessmentPackageDependencies fails on duplicate item ID in PEER_ASSESSMENT
+{
+  const pkg = createValidPackage();
+  const peerInst: SelfPeerAssessmentInstrument = {
+    id: 'inst-peer-1',
+    type: 'PEER_ASSESSMENT',
+    title: 'Penilaian Antarteman',
+    items: [
+      { id: 'item-mc-1', statement: 'Pernyataan Antarteman' }, // duplicate ID!
+    ],
+  };
+  pkg.instruments.push(peerInst);
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 28: Duplicate item ID in PEER_ASSESSMENT invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('Duplicate instrument item ID')),
+    'Test 28: Contains duplicate item ID reason'
+  );
+}
+
+// Test 29: Invalidation - answer key referencing deleted instrument
+{
+  const pkg = createValidPackage();
+  pkg.answerKeys[0].instrumentId = 'inst-non-existent';
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 29: Answer key referencing deleted instrument invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('instrumentId [inst-non-existent] yang telah dihapus')),
+    'Test 29: Contains deleted instrument ID reason'
+  );
+}
+
+// Test 30: Invalidation - answer key referencing deleted item
+{
+  const pkg = createValidPackage();
+  pkg.answerKeys[0].instrumentItemId = 'item-deleted-99';
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 30: Answer key referencing deleted item invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('butir [item-deleted-99] yang telah dihapus')),
+    'Test 30: Contains deleted item ID reason'
+  );
+}
+
+// Test 31: Invalidation - answer key cross-instrument reference
+{
+  const pkg = createValidPackage();
+  const oralInst: OralAssessmentInstrument = {
+    id: 'inst-oral-2',
+    type: 'ORAL_TEST',
+    title: 'Tes Lisan 2',
+    items: [{ id: 'item-oral-2', prompt: 'Prompt', order: 1 }],
+  };
+  pkg.instruments.push(oralInst);
+  pkg.answerKeys[0].instrumentId = 'inst-oral-2';
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 31: Answer key with cross-instrument reference invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('cross-instrument reference')),
+    'Test 31: Contains cross-instrument reference reason'
+  );
+}
+
+// Test 32: Invalidation - answer key referencing deleted option ID
+{
+  const pkg = createValidPackage();
+  pkg.answerKeys[0].optionIds = ['opt-deleted-99'];
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 32: Answer key referencing deleted option ID invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('opsi ID [opt-deleted-99] yang telah dihapus')),
+    'Test 32: Contains deleted option ID reason'
+  );
+}
+
+// Test 33: Invalidation - answer key referencing deleted matching premise
+{
+  const pkg = createValidPackage();
+  const writtenInst = pkg.instruments[0] as WrittenAssessmentInstrument;
+  writtenInst.items!.push({
+    id: 'item-match-1',
+    itemType: 'MATCHING',
+    prompt: 'Menjodohkan',
+    matchingPremises: [{ id: 'prem-1', text: 'Premis 1' }],
+    matchingResponses: [{ id: 'resp-1', text: 'Respon 1' }],
+    order: 3,
+  });
+  pkg.answerKeys.push({
+    id: 'ak-match-1',
+    instrumentId: writtenInst.id,
+    instrumentItemId: 'item-match-1',
+    answerType: 'MATCHING',
+    matchingPairs: [{ premiseId: 'prem-deleted', responseId: 'resp-1' }],
+  });
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 33: Answer key referencing deleted matching premise invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('premis [prem-deleted] yang telah dihapus')),
+    'Test 33: Contains deleted premise ID reason'
+  );
+}
+
+// Test 34: Invalidation - answer key referencing deleted matching response
+{
+  const pkg = createValidPackage();
+  const writtenInst = pkg.instruments[0] as WrittenAssessmentInstrument;
+  writtenInst.items!.push({
+    id: 'item-match-2',
+    itemType: 'MATCHING',
+    prompt: 'Menjodohkan 2',
+    matchingPremises: [{ id: 'prem-2', text: 'Premis 2' }],
+    matchingResponses: [{ id: 'resp-2', text: 'Respon 2' }],
+    order: 3,
+  });
+  pkg.answerKeys.push({
+    id: 'ak-match-2',
+    instrumentId: writtenInst.id,
+    instrumentItemId: 'item-match-2',
+    answerType: 'MATCHING',
+    matchingPairs: [{ premiseId: 'prem-2', responseId: 'resp-deleted' }],
+  });
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 34: Answer key referencing deleted matching response invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('respon [resp-deleted] yang telah dihapus')),
+    'Test 34: Contains deleted response ID reason'
+  );
+}
+
+// Test 35: Invalidation - answer key referencing deleted category statement
+{
+  const pkg = createValidPackage();
+  const writtenInst = pkg.instruments[0] as WrittenAssessmentInstrument;
+  writtenInst.items!.push({
+    id: 'item-cat-1',
+    itemType: 'CATEGORY_RESPONSE',
+    prompt: 'Kategori 1',
+    categoryResponseCategories: [{ id: 'cat-1', label: 'Benar' }],
+    categoryResponseStatements: [{ id: 'stmt-1', text: 'Pernyataan 1' }],
+    order: 3,
+  });
+  pkg.answerKeys.push({
+    id: 'ak-cat-1',
+    instrumentId: writtenInst.id,
+    instrumentItemId: 'item-cat-1',
+    answerType: 'CATEGORY_RESPONSE',
+    categoryAnswers: [{ statementId: 'stmt-deleted', categoryId: 'cat-1' }],
+  });
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 35: Answer key referencing deleted category statement invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('pernyataan [stmt-deleted] yang telah dihapus')),
+    'Test 35: Contains deleted statement ID reason'
+  );
+}
+
+// Test 36: Invalidation - answer key referencing deleted category ID
+{
+  const pkg = createValidPackage();
+  const writtenInst = pkg.instruments[0] as WrittenAssessmentInstrument;
+  writtenInst.items!.push({
+    id: 'item-cat-2',
+    itemType: 'CATEGORY_RESPONSE',
+    prompt: 'Kategori 2',
+    categoryResponseCategories: [{ id: 'cat-2', label: 'Benar' }],
+    categoryResponseStatements: [{ id: 'stmt-2', text: 'Pernyataan 2' }],
+    order: 3,
+  });
+  pkg.answerKeys.push({
+    id: 'ak-cat-2',
+    instrumentId: writtenInst.id,
+    instrumentItemId: 'item-cat-2',
+    answerType: 'CATEGORY_RESPONSE',
+    categoryAnswers: [{ statementId: 'stmt-2', categoryId: 'cat-deleted' }],
+  });
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 36: Answer key referencing deleted category ID invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('kategori [cat-deleted] yang telah dihapus')),
+    'Test 36: Contains deleted category ID reason'
+  );
+}
+
+// Test 37: Invalidation - instrument referencing deleted rubricId
+{
+  const pkg = createValidPackage();
+  (pkg.instruments[0] as WrittenAssessmentInstrument & { rubricId?: string }).rubricId = 'rub-deleted-99';
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 37: Instrument referencing deleted rubricId invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('rubricId [rub-deleted-99] yang telah dihapus')),
+    'Test 37: Contains deleted rubricId reason'
+  );
+}
+
+// Test 38: Invalidation - instrument referencing deleted scoringGuideId
+{
+  const pkg = createValidPackage();
+  (pkg.instruments[0] as WrittenAssessmentInstrument & { scoringGuideId?: string }).scoringGuideId = 'sg-deleted-99';
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 38: Instrument referencing deleted scoringGuideId invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('scoringGuideId [sg-deleted-99] yang telah dihapus')),
+    'Test 38: Contains deleted scoringGuideId reason'
+  );
+}
+
+// Test 39: Invalidation - blueprint referencing deleted TP
+{
+  const pkg = createValidPackage();
+  pkg.blueprintItems[0].objectiveRefId = 'tp-deleted-99';
+  const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
+  assert(res.isInvalidated, 'Test 39: Blueprint referencing deleted TP invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('tidak valid atau telah dihapus di hulu')),
+    'Test 39: Contains deleted TP reference reason'
+  );
+}
+
+// Test 40: Invalidation - blueprint referencing invalid KKTP criterion
+{
+  const pkg = createValidPackage();
+  pkg.blueprintItems[0].criterionId = 'crit-deleted-99';
+  const res = invalidateAssessmentPackageDependencies(pkg, {
+    ...mockContext,
+    assessmentCriteria: [
+      {
+        id: 'crit-valid-1',
+        academicSettingId: 'setting-1',
+        tpId: 'tp-1',
+        description: 'Kriteria 1',
+        approach: 'skala_interval',
+        indicators: [],
+        levels: [],
+        workflowStatus: 'SIAP',
+        needsReview: false,
+        updatedAt: new Date().toISOString(),
+      },
+    ],
+  });
+  assert(res.isInvalidated, 'Test 40: Blueprint referencing deleted criterion invalidates package');
+  assert(
+    res.reasons.some((r) => r.includes('tidak lagi ditemukan pada sumber kriteria')),
+    'Test 40: Contains missing criterion reason'
+  );
 }
 
 console.log(`\nResults: ${passed} passed, ${failed} failed.`);

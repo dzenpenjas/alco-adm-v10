@@ -1406,7 +1406,24 @@ export function invalidateAssessmentPackageDependencies(
   });
 
   // 6. Check Answer Keys References Integrity
-  const instrumentMap = new Map(pkg.instruments.map((i) => [i.id, i]));
+  const invalidationInstrumentIds = new Set<string>();
+  const instrumentMap = new Map<string, AssessmentInstrument>();
+
+  pkg.instruments.forEach((inst) => {
+    if (!inst.id || inst.id.trim() === '') {
+      reasons.push('Terdapat instrumen tanpa id canonical.');
+      return;
+    }
+
+    if (invalidationInstrumentIds.has(inst.id)) {
+      reasons.push(`Duplicate instrument ID [${inst.id}] terdeteksi pada Perangkat Asesmen.`);
+      return;
+    }
+
+    invalidationInstrumentIds.add(inst.id);
+    instrumentMap.set(inst.id, inst);
+  });
+
   const allItemLookup = new Map<
     string,
     {
@@ -1419,11 +1436,42 @@ export function invalidateAssessmentPackageDependencies(
     }
   >();
 
+  const invalidationItemIds = new Set<string>();
+
+  const registerInvalidationItem = (
+    itemId: string | undefined,
+    meta: {
+      instrumentId: string;
+      options?: WrittenAssessmentOption[];
+      matchingPremises?: MatchingAssessmentEntry[];
+      matchingResponses?: MatchingAssessmentEntry[];
+      categoryResponseStatements?: CategoryResponseStatement[];
+      categoryResponseCategories?: CategoryResponseCategory[];
+    }
+  ) => {
+    if (!itemId || itemId.trim() === '') {
+      reasons.push(
+        `Terdapat instrument item tanpa id canonical pada instrumen [${meta.instrumentId}].`
+      );
+      return;
+    }
+
+    if (invalidationItemIds.has(itemId)) {
+      reasons.push(
+        `Duplicate instrument item ID [${itemId}] terdeteksi pada Perangkat Asesmen.`
+      );
+      return;
+    }
+
+    invalidationItemIds.add(itemId);
+    allItemLookup.set(itemId, meta);
+  };
+
   pkg.instruments.forEach((inst) => {
     switch (inst.type) {
       case 'WRITTEN_TEST':
         (inst as WrittenAssessmentInstrument).items?.forEach((it) => {
-          allItemLookup.set(it.id, {
+          registerInvalidationItem(it.id, {
             instrumentId: inst.id,
             options: it.options,
             matchingPremises: it.matchingPremises,
@@ -1454,23 +1502,23 @@ export function invalidateAssessmentPackageDependencies(
         break;
       case 'ORAL_TEST':
         (inst as OralAssessmentInstrument).items?.forEach((it) => {
-          allItemLookup.set(it.id, { instrumentId: inst.id });
+          registerInvalidationItem(it.id, { instrumentId: inst.id });
         });
         break;
       case 'PERFORMANCE':
         (inst as PerformanceAssessmentInstrument).aspects?.forEach((asp) => {
-          allItemLookup.set(asp.id, { instrumentId: inst.id });
+          registerInvalidationItem(asp.id, { instrumentId: inst.id });
         });
         break;
       case 'OBSERVATION':
         (inst as ObservationAssessmentInstrument).aspects?.forEach((asp) => {
-          allItemLookup.set(asp.id, { instrumentId: inst.id });
+          registerInvalidationItem(asp.id, { instrumentId: inst.id });
         });
         break;
       case 'SELF_ASSESSMENT':
       case 'PEER_ASSESSMENT':
         (inst as SelfPeerAssessmentInstrument).items?.forEach((it) => {
-          allItemLookup.set(it.id, { instrumentId: inst.id });
+          registerInvalidationItem(it.id, { instrumentId: inst.id });
         });
         break;
       default:
