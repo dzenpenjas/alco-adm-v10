@@ -190,11 +190,19 @@ console.log('=== B.1.2p Canonical ID, Reference & Scope Integrity Regression Tes
 // Test 2: Duplicate instrument ID
 {
   const pkg = createValidPackage();
-  pkg.instruments.push({
+  const duplicateOral: OralAssessmentInstrument = {
     id: 'inst-written-1', // duplicate!
     type: 'ORAL_TEST',
     title: 'Tes Lisan',
-  } as OralAssessmentInstrument);
+    items: [
+      {
+        id: 'oral-item-duplicate-inst-test',
+        prompt: 'Pertanyaan lisan?',
+        order: 1,
+      },
+    ],
+  };
+  pkg.instruments.push(duplicateOral);
   const res = validateAssessmentPackage(pkg, mockContext);
   assert(!res.valid, 'Test 2: Duplicate instrument ID fails validation');
   assert(
@@ -446,11 +454,19 @@ console.log('=== B.1.2p Canonical ID, Reference & Scope Integrity Regression Tes
 // Test 20: invalidateAssessmentPackageDependencies fails on duplicate instrument ID
 {
   const pkg = createValidPackage();
-  pkg.instruments.push({
+  const duplicateOral: OralAssessmentInstrument = {
     id: 'inst-written-1', // duplicate!
     type: 'ORAL_TEST',
     title: 'Tes Lisan',
-  } as OralAssessmentInstrument);
+    items: [
+      {
+        id: 'oral-item-duplicate-inst-test',
+        prompt: 'Pertanyaan lisan?',
+        order: 1,
+      },
+    ],
+  };
+  pkg.instruments.push(duplicateOral);
   const res = invalidateAssessmentPackageDependencies(pkg, mockContext);
   assert(res.isInvalidated, 'Test 20: Duplicate instrument ID invalidates package');
   assert(
@@ -831,6 +847,161 @@ console.log('=== B.1.2p Canonical ID, Reference & Scope Integrity Regression Tes
     res.reasons.some((r) => r.includes('tidak lagi ditemukan pada sumber kriteria')),
     'Test 40: Contains missing criterion reason'
   );
+}
+
+// Test 41: True rubric cross-instrument ownership mismatch
+{
+  const pkg = createValidPackage();
+  const oralInst: OralAssessmentInstrument = {
+    id: 'inst-oral-B',
+    type: 'ORAL_TEST',
+    title: 'Tes Lisan B',
+    items: [
+      {
+        id: 'item-oral-B-1',
+        prompt: 'Pertanyaan lisan B?',
+        order: 1,
+      },
+    ],
+  };
+  pkg.instruments.push(oralInst);
+
+  // Cross-instrument rubric: assigned to inst-written-1, but instrumentItemId points to item-oral-B-1 (belonging to inst-oral-B)
+  pkg.rubrics.push({
+    id: 'rub-cross-instrument',
+    title: 'Rubrik Cross Instrument',
+    criteria: [{ id: 'crit-cross', label: 'Kriteria Cross' }],
+    scale: [{ id: 'sc-cross', label: 'Baik', score: 3, order: 1 }],
+    instrumentId: 'inst-written-1',
+    instrumentItemId: 'item-oral-B-1',
+  });
+
+  const planWithOral: AssessmentPlan = {
+    ...mockPlan,
+    instruments: [
+      { id: 'inst-written-1', type: 'WRITTEN_TEST', label: 'Tes Tertulis' },
+      { id: 'inst-oral-B', type: 'ORAL_TEST', label: 'Tes Lisan B' },
+    ],
+  };
+
+  const res = validateAssessmentPackage(pkg, { ...mockContext, assessmentPlan: planWithOral });
+  assert(!res.valid, 'Test 41: True rubric cross-instrument ownership fails validation');
+  assert(
+    res.errors.some((e) => e.includes('milik instrumen lain')),
+    'Test 41: Contains cross-instrument ownership error message'
+  );
+}
+
+// Test 42: Parent plan academicSetting mismatch isolated
+{
+  const pkg = createValidPackage();
+  pkg.academicSettingId = 'setting-1';
+  const planWithDifferentSetting: AssessmentPlan = {
+    ...mockPlan,
+    academicSettingId: 'setting-2',
+  };
+  const res = validateAssessmentPackage(pkg, {
+    ...mockContext,
+    academicSetting: mockSetting, // context setting is setting-1
+    assessmentPlan: planWithDifferentSetting,
+  });
+  assert(!res.valid, 'Test 42: Parent plan academicSetting mismatch fails validation');
+  assert(
+    res.errors.some((e) => e.includes('tidak cocok dengan Rencana Asesmen induk')),
+    'Test 42: Contains parent-plan academicSetting mismatch error message'
+  );
+}
+
+// Test 43: Workspace all absent
+{
+  const pkg = createValidPackage();
+  pkg.workspaceId = undefined;
+  const planNoWorkspace: AssessmentPlan = {
+    ...mockPlan,
+    workspaceId: undefined,
+  };
+  const res = validateAssessmentPackage(pkg, {
+    ...mockContext,
+    assessmentPlan: planNoWorkspace,
+  });
+  assert(res.valid, 'Test 43: Workspace all absent passes validation');
+}
+
+// Test 44: Workspace match
+{
+  const pkg = createValidPackage();
+  pkg.workspaceId = 'ws-1';
+  const planWithWs1: AssessmentPlan = {
+    ...mockPlan,
+    workspaceId: 'ws-1',
+  };
+  const res = validateAssessmentPackage(pkg, {
+    ...mockContext,
+    assessmentPlan: planWithWs1,
+  });
+  assert(res.valid, 'Test 44: Workspace match passes validation');
+}
+
+// Test 45: Preservation B.1.2m - Exact item number & option ID integrity
+{
+  const pkg = createValidPackage();
+  const writtenInst = pkg.instruments[0] as WrittenAssessmentInstrument;
+  const mcItem = writtenInst.items![0];
+  const akMc = pkg.answerKeys[0];
+
+  assert(akMc.instrumentItemId === mcItem.id, 'Test 45: Answer key points to valid item ID');
+  assert(akMc.optionIds !== undefined && akMc.optionIds[0] === 'opt-a', 'Test 45: Answer key option ID preserved');
+
+  const res = validateAssessmentPackage(pkg, mockContext);
+  assert(res.valid, 'Test 45: Valid B.1.2m package with answer key option IDs passes');
+}
+
+// Test 46: Preservation B.1.2n - ESSAY AnswerKey SSOT integrity
+{
+  const pkg = createValidPackage();
+  // Remove ESSAY answer key
+  pkg.answerKeys = pkg.answerKeys.filter((ak) => ak.instrumentItemId !== 'item-essay-1');
+  const res = validateAssessmentPackage(pkg, mockContext);
+  assert(!res.valid, 'Test 46: ESSAY item without AnswerKey fails validation');
+  assert(
+    res.errors.some((e) => e.includes('kunci/rambu jawaban canonical') || e.includes('Kunci jawaban')),
+    'Test 46: Contains missing ESSAY answer key error message'
+  );
+}
+
+// Test 47: Preservation B.1.2o - ESSAY ScoringGuide integrity
+{
+  const pkg = createValidPackage();
+  // Remove ESSAY scoring guide
+  pkg.scoringGuides = [];
+  const res = validateAssessmentPackage(pkg, mockContext);
+  assert(!res.valid, 'Test 47: ESSAY item without ScoringGuide fails validation');
+  assert(
+    res.errors.some((e) => e.includes('pedoman penskoran canonical yang valid') || e.includes('Pedoman penskoran')),
+    'Test 47: Contains missing ESSAY scoring guide error message'
+  );
+}
+
+// Test 48: Comprehensive zero type escapes enforcement
+{
+  const servicePath = path.resolve(process.cwd(), 'src/services/assessmentPackageService.ts');
+  const testPath = path.resolve(process.cwd(), 'scripts/testB12pCanonicalIdentityScopeIntegrityRegression.ts');
+
+  const serviceCode = fs.readFileSync(servicePath, 'utf8');
+  const testCode = fs.readFileSync(testPath, 'utf8');
+
+  const forbidden = [
+    'as ' + 'any',
+    'as ' + 'unknown ' + 'as',
+    '@ts-' + 'ignore',
+    '@ts-' + 'expect-error',
+  ];
+
+  const serviceHasEscapes = forbidden.some((pat) => serviceCode.includes(pat));
+  const testHasEscapes = forbidden.some((pat) => testCode.includes(pat));
+
+  assert(!serviceHasEscapes, 'Test 48: Zero type escapes in production service');
+  assert(!testHasEscapes, 'Test 48: Zero type escapes in regression test script');
 }
 
 console.log(`\nResults: ${passed} passed, ${failed} failed.`);
