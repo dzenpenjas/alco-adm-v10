@@ -35,6 +35,7 @@ import {
   AssessmentCriterion,
   AssessmentPlan,
   WrittenAssessmentInstrument,
+  WrittenAssessmentItem,
   OralAssessmentInstrument,
 } from '../../types';
 import { DocumentGenerationContext } from './types';
@@ -684,11 +685,62 @@ export function buildNormalizedAssessmentDocumentModel(
   const answerKeys: NormalizedAssessmentAnswerKey[] = isBlank
     ? []
     : snapshot.answerKeys.map((ak, idx) => {
+        const linkedInstrument = snapshot.instruments.find(
+          (inst) => inst.id === ak.instrumentId
+        );
+
+        let linkedItemOrder: number | undefined;
+        let linkedWrittenItem: WrittenAssessmentItem | undefined;
+
+        if (linkedInstrument?.type === 'WRITTEN_TEST') {
+          linkedItemOrder = (linkedInstrument as WrittenAssessmentInstrument).items?.find(
+            (item) => item.id === ak.instrumentItemId
+          )?.order;
+          linkedWrittenItem = (linkedInstrument as WrittenAssessmentInstrument).items?.find(
+            (item) => item.id === ak.instrumentItemId
+          );
+        } else if (linkedInstrument?.type === 'ORAL_TEST') {
+          linkedItemOrder = (linkedInstrument as OralAssessmentInstrument).items?.find(
+            (item) => item.id === ak.instrumentItemId
+          )?.order;
+        }
+
         let valueStr = ak.value || '';
-        if (ak.answerType === 'OPTION' && ak.optionIds && ak.optionIds.length > 0) {
-          valueStr = ak.optionIds.join(', ');
-        } else if (ak.answerType === 'MULTIPLE_OPTION' && ak.optionIds) {
-          valueStr = ak.optionIds.join(', ');
+        if (ak.answerType === 'OPTION') {
+          if (!ak.optionIds || ak.optionIds.length === 0 || !linkedWrittenItem || !linkedWrittenItem.options) {
+            valueStr = '-';
+          } else {
+            const optId = ak.optionIds[0];
+            const matchedOpt = linkedWrittenItem.options.find((o) => o.id === optId);
+            const labelStr = matchedOpt?.label ? matchedOpt.label.trim() : '';
+            if (matchedOpt && labelStr.length > 0) {
+              valueStr = labelStr;
+            } else {
+              valueStr = '-';
+            }
+          }
+        } else if (ak.answerType === 'MULTIPLE_OPTION') {
+          if (!ak.optionIds || ak.optionIds.length === 0 || !linkedWrittenItem || !linkedWrittenItem.options) {
+            valueStr = '-';
+          } else {
+            const itemOpts = linkedWrittenItem.options;
+            const targetSet = new Set(ak.optionIds);
+
+            // Verify all optionIds exist in exact linked item options
+            const allExist = ak.optionIds.every((id) => itemOpts.some((o) => o.id === id));
+            if (!allExist) {
+              valueStr = '-';
+            } else {
+              // Order labels according to canonical item options order
+              const selectedOpts = itemOpts.filter((o) => targetSet.has(o.id));
+              const labels = selectedOpts.map((o) => (o.label ? o.label.trim() : ''));
+              if (labels.some((l) => l.length === 0)) {
+                valueStr = '-';
+              } else {
+                valueStr = labels.join(', ');
+              }
+            }
+          }
         } else if (ak.answerType === 'MATCHING' && ak.matchingPairs) {
           valueStr = ak.matchingPairs
             .map((p) => `${p.premiseId} ➔ ${p.responseId}`)
@@ -697,21 +749,6 @@ export function buildNormalizedAssessmentDocumentModel(
           valueStr = ak.categoryAnswers
             .map((ca) => `Pernyataan [${ca.statementId}]: Kategori [${ca.categoryId}]`)
             .join('; ');
-        }
-
-        const linkedInstrument = snapshot.instruments.find(
-          (inst) => inst.id === ak.instrumentId
-        );
-
-        let linkedItemOrder: number | undefined;
-        if (linkedInstrument?.type === 'WRITTEN_TEST') {
-          linkedItemOrder = (linkedInstrument as WrittenAssessmentInstrument).items?.find(
-            (item) => item.id === ak.instrumentItemId
-          )?.order;
-        } else if (linkedInstrument?.type === 'ORAL_TEST') {
-          linkedItemOrder = (linkedInstrument as OralAssessmentInstrument).items?.find(
-            (item) => item.id === ak.instrumentItemId
-          )?.order;
         }
 
         return {

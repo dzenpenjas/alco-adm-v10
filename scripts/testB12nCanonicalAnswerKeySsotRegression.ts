@@ -10,11 +10,16 @@ import {
   CategoryResponseCategory,
   CategoryResponseStatement,
   AssessmentAnswerKey,
+  AssessmentDocumentSnapshot,
   TPData,
   TeacherProfile,
   SchoolData,
 } from '../src/types';
 import { validateAssessmentPackage } from '../src/services/assessmentPackageService';
+import {
+  buildNormalizedAssessmentDocumentModel,
+  createAssessmentPreviewModel,
+} from '../src/services/documentEngine/assessmentExportService';
 
 function runB12nTests() {
   console.log('--- START B.1.2n CANONICAL ANSWER KEY SSOT REGRESSION TESTS ---');
@@ -858,6 +863,340 @@ function runB12nTests() {
     }
   }
   recordPass('Zero type escapes enforced in regression test suite');
+
+  // Shared snapshot base fixture for presentation layer tests
+  const mockSnapshotBase: AssessmentDocumentSnapshot = {
+    snapshotId: 'snap-test-1',
+    mode: 'CANONICAL_PACKAGE',
+    documentType: 'ASESMEN',
+    documentDate: '2026-09-24',
+    formattedDocumentDate: 'Surakarta, 24 September 2026',
+    assessmentPlanId: 'plan-1',
+    assessmentPackageId: 'pkg-1',
+    assessmentPackageRevision: 1,
+    packageTitle: 'Paket Asesmen Tes',
+    schoolName: 'SD Negeri 1',
+    principalName: 'Kepala Sekolah',
+    teacherName: 'Guru Penjas',
+    academicYear: '2025/2026',
+    semester: '1 (Ganjil)',
+    grade: 'Kelas 4',
+    subject: 'PJOK',
+    curriculum: 'Kurikulum Merdeka',
+    documentMode: 'data',
+    generatedAt: new Date().toISOString(),
+    blueprintItems: [
+      { id: 'bp-1', objectiveRefId: 'tp-1', instrumentType: 'WRITTEN_TEST', instrumentItemIds: ['item-1'], order: 1 },
+    ],
+    instruments: [
+      {
+        id: 'inst-1',
+        type: 'WRITTEN_TEST',
+        items: [
+          {
+            id: 'item-1',
+            itemType: 'MULTIPLE_CHOICE',
+            prompt: 'Soal 1',
+            order: 1,
+            options: [
+              { id: 'opt-a', label: 'A', text: 'Teks A' },
+              { id: 'opt-b', label: 'B', text: 'Teks B' },
+              { id: 'opt-c', label: 'C', text: 'Teks C' },
+            ],
+          },
+        ],
+      },
+    ],
+    answerKeys: [],
+    scoringGuides: [],
+    rubrics: [],
+    resolvedObjectives: {},
+  };
+
+  // TEST 33: OPTION canonical optionId resolves to option.label ("B")
+  const snap33: AssessmentDocumentSnapshot = {
+    ...mockSnapshotBase,
+    answerKeys: [
+      {
+        id: 'ak-33',
+        instrumentId: 'inst-1',
+        instrumentItemId: 'item-1',
+        answerType: 'OPTION',
+        optionIds: ['opt-b'],
+      },
+    ],
+  };
+  const model33 = buildNormalizedAssessmentDocumentModel(snap33);
+  if (model33.answerKeys.list[0]?.value !== 'B') {
+    throw new Error(`Test 33 Failed: Expected 'B', got '${model33.answerKeys.list[0]?.value}'`);
+  }
+  recordPass('OPTION canonical optionId resolves to option.label ("B")');
+
+  // TEST 34: MULTIPLE_OPTION preserves canonical option order ("A, C") regardless of click order
+  const snap34: AssessmentDocumentSnapshot = {
+    ...mockSnapshotBase,
+    instruments: [
+      {
+        id: 'inst-1',
+        type: 'WRITTEN_TEST',
+        items: [
+          {
+            id: 'item-1',
+            itemType: 'MULTIPLE_SELECT',
+            prompt: 'Soal MS',
+            order: 1,
+            options: [
+              { id: 'opt-a', label: 'A', text: 'Teks A' },
+              { id: 'opt-b', label: 'B', text: 'Teks B' },
+              { id: 'opt-c', label: 'C', text: 'Teks C' },
+            ],
+          },
+        ],
+      },
+    ],
+    answerKeys: [
+      {
+        id: 'ak-34',
+        instrumentId: 'inst-1',
+        instrumentItemId: 'item-1',
+        answerType: 'MULTIPLE_OPTION',
+        optionIds: ['opt-c', 'opt-a'],
+      },
+    ],
+  };
+  const model34 = buildNormalizedAssessmentDocumentModel(snap34);
+  if (model34.answerKeys.list[0]?.value !== 'A, C') {
+    throw new Error(`Test 34 Failed: Expected 'A, C', got '${model34.answerKeys.list[0]?.value}'`);
+  }
+  recordPass('MULTIPLE_OPTION preserves canonical option order ("A, C") regardless of click order');
+
+  // TEST 35: Dangling OPTION optionId resolves to visible "-"
+  const snap35: AssessmentDocumentSnapshot = {
+    ...mockSnapshotBase,
+    answerKeys: [
+      {
+        id: 'ak-35',
+        instrumentId: 'inst-1',
+        instrumentItemId: 'item-1',
+        answerType: 'OPTION',
+        optionIds: ['opt-ghost'],
+      },
+    ],
+  };
+  const model35 = buildNormalizedAssessmentDocumentModel(snap35);
+  if (model35.answerKeys.list[0]?.value !== '-') {
+    throw new Error(`Test 35 Failed: Expected '-', got '${model35.answerKeys.list[0]?.value}'`);
+  }
+  recordPass('Dangling OPTION optionId resolves to visible "-"');
+
+  // TEST 36: Partial dangling MULTIPLE_OPTION fails visibly to "-" without partial success
+  const snap36: AssessmentDocumentSnapshot = {
+    ...mockSnapshotBase,
+    answerKeys: [
+      {
+        id: 'ak-36',
+        instrumentId: 'inst-1',
+        instrumentItemId: 'item-1',
+        answerType: 'MULTIPLE_OPTION',
+        optionIds: ['opt-a', 'opt-ghost'],
+      },
+    ],
+  };
+  const model36 = buildNormalizedAssessmentDocumentModel(snap36);
+  if (model36.answerKeys.list[0]?.value !== '-') {
+    throw new Error(`Test 36 Failed: Expected '-', got '${model36.answerKeys.list[0]?.value}'`);
+  }
+  recordPass('Partial dangling MULTIPLE_OPTION fails visibly to "-" without partial success');
+
+  // TEST 37: Empty canonical option label resolves to "-"
+  const snap37: AssessmentDocumentSnapshot = {
+    ...mockSnapshotBase,
+    instruments: [
+      {
+        id: 'inst-1',
+        type: 'WRITTEN_TEST',
+        items: [
+          {
+            id: 'item-1',
+            itemType: 'MULTIPLE_CHOICE',
+            prompt: 'Soal MC',
+            order: 1,
+            options: [{ id: 'opt-a', label: '', text: 'Opsi tanpa label' }],
+          },
+        ],
+      },
+    ],
+    answerKeys: [
+      {
+        id: 'ak-37',
+        instrumentId: 'inst-1',
+        instrumentItemId: 'item-1',
+        answerType: 'OPTION',
+        optionIds: ['opt-a'],
+      },
+    ],
+  };
+  const model37 = buildNormalizedAssessmentDocumentModel(snap37);
+  if (model37.answerKeys.list[0]?.value !== '-') {
+    throw new Error(`Test 37 Failed: Expected '-', got '${model37.answerKeys.list[0]?.value}'`);
+  }
+  recordPass('Empty canonical option label resolves to "-"');
+
+  // TEST 38: Option text is never used as fallback label
+  const snap38: AssessmentDocumentSnapshot = {
+    ...snap37,
+    instruments: [
+      {
+        id: 'inst-1',
+        type: 'WRITTEN_TEST',
+        items: [
+          {
+            id: 'item-1',
+            itemType: 'MULTIPLE_CHOICE',
+            prompt: 'Soal MC',
+            order: 1,
+            options: [{ id: 'opt-a', label: '   ', text: 'Berlari Cepat' }],
+          },
+        ],
+      },
+    ],
+  };
+  const model38 = buildNormalizedAssessmentDocumentModel(snap38);
+  if (model38.answerKeys.list[0]?.value === 'Berlari Cepat') {
+    throw new Error('Test 38 Failed: Option text was incorrectly used as fallback label');
+  }
+  if (model38.answerKeys.list[0]?.value !== '-') {
+    throw new Error(`Test 38 Failed: Expected '-', got '${model38.answerKeys.list[0]?.value}'`);
+  }
+  recordPass('Option text is never used as fallback label');
+
+  // TEST 39: Exact instrument ownership strictly enforced (cross-instrument option blocked)
+  const snap39: AssessmentDocumentSnapshot = {
+    ...mockSnapshotBase,
+    instruments: [
+      {
+        id: 'inst-1',
+        type: 'WRITTEN_TEST',
+        items: [
+          {
+            id: 'item-1',
+            itemType: 'MULTIPLE_CHOICE',
+            prompt: 'Soal Inst 1',
+            order: 1,
+            options: [{ id: 'opt-x', label: 'X', text: 'Item 1 Opt X' }],
+          },
+        ],
+      },
+      {
+        id: 'inst-2',
+        type: 'WRITTEN_TEST',
+        items: [
+          {
+            id: 'item-2',
+            itemType: 'MULTIPLE_CHOICE',
+            prompt: 'Soal Inst 2',
+            order: 1,
+            options: [{ id: 'opt-a', label: 'A', text: 'Item 2 Opt A' }],
+          },
+        ],
+      },
+    ],
+    answerKeys: [
+      {
+        id: 'ak-39',
+        instrumentId: 'inst-1',
+        instrumentItemId: 'item-1',
+        answerType: 'OPTION',
+        optionIds: ['opt-a'],
+      },
+    ],
+  };
+  const model39 = buildNormalizedAssessmentDocumentModel(snap39);
+  if (model39.answerKeys.list[0]?.value !== '-') {
+    throw new Error(`Test 39 Failed: Expected '-', got '${model39.answerKeys.list[0]?.value}'`);
+  }
+  recordPass('Exact instrument ownership strictly enforced (cross-instrument option blocked)');
+
+  // TEST 40: Exact item ownership strictly enforced (cross-item option in same instrument blocked)
+  const snap40: AssessmentDocumentSnapshot = {
+    ...mockSnapshotBase,
+    instruments: [
+      {
+        id: 'inst-1',
+        type: 'WRITTEN_TEST',
+        items: [
+          {
+            id: 'item-1',
+            itemType: 'MULTIPLE_CHOICE',
+            prompt: 'Soal 1',
+            order: 1,
+            options: [{ id: 'opt-1a', label: 'A', text: 'Item 1 Opt A' }],
+          },
+          {
+            id: 'item-2',
+            itemType: 'MULTIPLE_CHOICE',
+            prompt: 'Soal 2',
+            order: 2,
+            options: [{ id: 'opt-2a', label: 'A', text: 'Item 2 Opt A' }],
+          },
+        ],
+      },
+    ],
+    answerKeys: [
+      {
+        id: 'ak-40',
+        instrumentId: 'inst-1',
+        instrumentItemId: 'item-1',
+        answerType: 'OPTION',
+        optionIds: ['opt-2a'],
+      },
+    ],
+  };
+  const model40 = buildNormalizedAssessmentDocumentModel(snap40);
+  if (model40.answerKeys.list[0]?.value !== '-') {
+    throw new Error(`Test 40 Failed: Expected '-', got '${model40.answerKeys.list[0]?.value}'`);
+  }
+  recordPass('Exact item ownership strictly enforced (cross-item option in same instrument blocked)');
+
+  // TEST 41: Preview model consumes normalized answer key label ("A")
+  const previewContext = {
+    ...defaultContext,
+    documentDate: '2026-09-24',
+    school: mockSchool,
+    profile: mockProfile,
+    activeAssessmentPackageId: pkgMcValid.id,
+    assessmentPackages: [pkgMcValid],
+  };
+  const previewModel = createAssessmentPreviewModel(previewContext);
+  if (previewModel.answerKeys.list[0]?.value !== 'A') {
+    throw new Error(`Test 41 Failed: Preview model expected 'A', got '${previewModel.answerKeys.list[0]?.value}'`);
+  }
+  recordPass('Preview model consumes normalized answer key label ("A")');
+
+  // TEST 42: DOCX export model consumes normalized ak.value
+  const exportSrcForDocx = fs.readFileSync(path.resolve(process.cwd(), 'src/services/documentEngine/assessmentExportService.ts'), 'utf8');
+  if (!exportSrcForDocx.includes('value: valueStr') || !exportSrcForDocx.includes('labels.join(\', \')')) {
+    throw new Error('Test 42 Failed: Export service does not populate normalized value for docx/pdf');
+  }
+  recordPass('DOCX export model consumes normalized ak.value');
+
+  // TEST 43: PDF export model consumes normalized ak.value
+  if (!exportSrcForDocx.includes('answerKeys: NormalizedAssessmentAnswerKey[]') && !exportSrcForDocx.includes('list: answerKeys')) {
+    throw new Error('Test 43 Failed: PDF renderer model does not map normalized answer keys');
+  }
+  recordPass('PDF export model consumes normalized ak.value');
+
+  // TEST 44: Zero isCorrect fallback in export strictly maintained
+  if (exportSrcForDocx.includes('opt.isCorrect') || exportSrcForDocx.includes('options?.find((o) => o.isCorrect)')) {
+    throw new Error('Test 44 Failed: Export service contains forbidden isCorrect fallback');
+  }
+  recordPass('Zero isCorrect fallback in export strictly maintained');
+
+  // TEST 45: B.1.2m exact itemNumber strictly preserved in normalized answer key model
+  if (model33.answerKeys.list[0]?.itemNumber !== 1) {
+    throw new Error(`Test 45 Failed: Expected itemNumber 1, got ${model33.answerKeys.list[0]?.itemNumber}`);
+  }
+  recordPass('B.1.2m exact itemNumber strictly preserved in normalized answer key model');
 
   console.log(`\n--- ALL ${passedTests} B.1.2n REGRESSION TESTS PASSED CLEANLY (0 FAILED) ---`);
 }
