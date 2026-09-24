@@ -1206,7 +1206,14 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
                                       const updatedInstruments = activePackage.instruments.map((inst) =>
                                         inst.type === 'WRITTEN_TEST' ? { ...writtenInst!, items: updatedItems } : inst
                                       );
-                                      updatePackage({ ...activePackage, instruments: updatedInstruments });
+                                      const updatedAnswerKeys = (activePackage.answerKeys || []).filter(
+                                        (ak) => !(ak.instrumentId === writtenInst!.id && ak.instrumentItemId === item.id)
+                                      );
+                                      updatePackage({
+                                        ...activePackage,
+                                        instruments: updatedInstruments,
+                                        answerKeys: updatedAnswerKeys,
+                                      });
                                     }}
                                     className="text-red-500 hover:text-red-700 p-1"
                                   >
@@ -1263,91 +1270,174 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
                                 </div>
                               )}
 
-                              {(item.itemType === 'MULTIPLE_CHOICE' || item.itemType === 'MULTIPLE_SELECT') && (
-                                <div className="space-y-2 pl-4 border-l-2 border-blue-200">
-                                  <label className="block text-xs font-bold text-slate-700">Opsi Jawaban:</label>
-                                  {(!item.options || item.options.length === 0) && (
-                                    <p className="text-xs text-slate-400 italic">Belum ada opsi jawaban. Klik tombol di bawah untuk menambahkan opsi.</p>
-                                  )}
-                                  {(item.options || []).map((opt) => (
-                                    <div key={opt.id} className="flex items-center gap-2">
-                                      <input
-                                        type="checkbox"
-                                        checked={opt.isCorrect || false}
-                                        onChange={(e) => {
-                                          const isCheck = e.target.checked;
-                                          const updatedOpts = item.options?.map((o) => {
-                                            if (item.itemType === 'MULTIPLE_CHOICE') {
-                                              return o.id === opt.id ? { ...o, isCorrect: isCheck } : { ...o, isCorrect: false };
-                                            }
-                                            return o.id === opt.id ? { ...o, isCorrect: isCheck } : o;
-                                          });
-                                          const updatedItems = writtenInst!.items.map((it) =>
-                                            it.id === item.id ? { ...it, options: updatedOpts } : it
-                                          );
-                                          const updatedInstruments = activePackage.instruments.map((inst) =>
-                                            inst.type === 'WRITTEN_TEST' ? { ...writtenInst!, items: updatedItems } : inst
-                                          );
-                                          updatePackage({ ...activePackage, instruments: updatedInstruments });
-                                        }}
-                                      />
-                                      <span className="text-xs font-bold text-slate-600 w-4">{opt.label}.</span>
-                                      <input
-                                        type="text"
-                                        value={opt.text}
-                                        onChange={(e) => {
-                                          const updatedOpts = item.options?.map((o) => (o.id === opt.id ? { ...o, text: e.target.value } : o));
-                                          const updatedItems = writtenInst!.items.map((it) =>
-                                            it.id === item.id ? { ...it, options: updatedOpts } : it
-                                          );
-                                          const updatedInstruments = activePackage.instruments.map((inst) =>
-                                            inst.type === 'WRITTEN_TEST' ? { ...writtenInst!, items: updatedItems } : inst
-                                          );
-                                          updatePackage({ ...activePackage, instruments: updatedInstruments });
-                                        }}
-                                        className="text-xs p-1.5 border border-slate-300 rounded flex-1 bg-white"
-                                        placeholder="Teks opsi jawaban..."
-                                      />
-                                      <button
-                                        onClick={() => {
-                                          const updatedOpts = item.options?.filter((o) => o.id !== opt.id);
-                                          const updatedItems = writtenInst!.items.map((it) =>
-                                            it.id === item.id ? { ...it, options: updatedOpts } : it
-                                          );
-                                          const updatedInstruments = activePackage.instruments.map((inst) =>
-                                            inst.type === 'WRITTEN_TEST' ? { ...writtenInst!, items: updatedItems } : inst
-                                          );
-                                          updatePackage({ ...activePackage, instruments: updatedInstruments });
-                                        }}
-                                        className="text-red-500 hover:text-red-700 p-1"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </div>
-                                  ))}
-                                  <button
-                                    onClick={() => {
-                                      const newOptLabel = String.fromCharCode(65 + (item.options?.length || 0));
-                                      const newOpt: WrittenAssessmentOption = {
-                                        id: `opt-${Date.now()}`,
-                                        label: newOptLabel,
-                                        text: '',
-                                      };
-                                      const updatedOpts = [...(item.options || []), newOpt];
-                                      const updatedItems = writtenInst!.items.map((it) =>
-                                        it.id === item.id ? { ...it, options: updatedOpts } : it
+                              {(item.itemType === 'MULTIPLE_CHOICE' || item.itemType === 'MULTIPLE_SELECT') && (() => {
+                                const optAnswerKey = (activePackage.answerKeys || []).find(
+                                  (ak) => ak.instrumentId === writtenInst!.id && ak.instrumentItemId === item.id
+                                );
+                                return (
+                                  <div className="space-y-2 pl-4 border-l-2 border-blue-200">
+                                    <label className="block text-xs font-bold text-slate-700">Opsi Jawaban:</label>
+                                    {(!item.options || item.options.length === 0) && (
+                                      <p className="text-xs text-slate-400 italic">Belum ada opsi jawaban. Klik tombol di bawah untuk menambahkan opsi.</p>
+                                    )}
+                                    {(item.options || []).map((opt) => {
+                                      const isChecked = optAnswerKey && optAnswerKey.optionIds
+                                        ? optAnswerKey.optionIds.includes(opt.id)
+                                        : Boolean(opt.isCorrect);
+
+                                      return (
+                                        <div key={opt.id} className="flex items-center gap-2">
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={(e) => {
+                                              const isCheck = e.target.checked;
+                                              const updatedOpts = item.options?.map((o) => {
+                                                if (item.itemType === 'MULTIPLE_CHOICE') {
+                                                  return o.id === opt.id ? { ...o, isCorrect: isCheck } : { ...o, isCorrect: false };
+                                                }
+                                                return o.id === opt.id ? { ...o, isCorrect: isCheck } : o;
+                                              });
+                                              const selectedOptionIds = (updatedOpts || [])
+                                                .filter((o) => o.isCorrect)
+                                                .map((o) => o.id);
+
+                                              const existingAk = (activePackage.answerKeys || []).find(
+                                                (ak) => ak.instrumentId === writtenInst!.id && ak.instrumentItemId === item.id
+                                              );
+
+                                              let updatedAnswerKeys: AssessmentAnswerKey[];
+                                              if (selectedOptionIds.length > 0) {
+                                                const updatedAk: AssessmentAnswerKey = {
+                                                  ...(existingAk || {
+                                                    id: `ak-${writtenInst!.id}-${item.id}`,
+                                                    instrumentId: writtenInst!.id,
+                                                    instrumentItemId: item.id,
+                                                  }),
+                                                  instrumentId: writtenInst!.id,
+                                                  instrumentItemId: item.id,
+                                                  answerType: item.itemType === 'MULTIPLE_CHOICE' ? 'OPTION' : 'MULTIPLE_OPTION',
+                                                  optionIds: selectedOptionIds,
+                                                };
+                                                if (existingAk) {
+                                                  updatedAnswerKeys = (activePackage.answerKeys || []).map((ak) =>
+                                                    ak.id === existingAk.id ? updatedAk : ak
+                                                  );
+                                                } else {
+                                                  updatedAnswerKeys = [...(activePackage.answerKeys || []), updatedAk];
+                                                }
+                                              } else {
+                                                updatedAnswerKeys = (activePackage.answerKeys || []).filter(
+                                                  (ak) => !(ak.instrumentId === writtenInst!.id && ak.instrumentItemId === item.id)
+                                                );
+                                              }
+
+                                              const updatedItems = writtenInst!.items.map((it) =>
+                                                it.id === item.id ? { ...it, options: updatedOpts } : it
+                                              );
+                                              const updatedInstruments = activePackage.instruments.map((inst) =>
+                                                inst.type === 'WRITTEN_TEST' ? { ...writtenInst!, items: updatedItems } : inst
+                                              );
+                                              updatePackage({
+                                                ...activePackage,
+                                                instruments: updatedInstruments,
+                                                answerKeys: updatedAnswerKeys,
+                                              });
+                                            }}
+                                          />
+                                          <span className="text-xs font-bold text-slate-600 w-4">{opt.label}.</span>
+                                          <input
+                                            type="text"
+                                            value={opt.text}
+                                            onChange={(e) => {
+                                              const updatedOpts = item.options?.map((o) => (o.id === opt.id ? { ...o, text: e.target.value } : o));
+                                              const updatedItems = writtenInst!.items.map((it) =>
+                                                it.id === item.id ? { ...it, options: updatedOpts } : it
+                                              );
+                                              const updatedInstruments = activePackage.instruments.map((inst) =>
+                                                inst.type === 'WRITTEN_TEST' ? { ...writtenInst!, items: updatedItems } : inst
+                                              );
+                                              updatePackage({ ...activePackage, instruments: updatedInstruments });
+                                            }}
+                                            className="text-xs p-1.5 border border-slate-300 rounded flex-1 bg-white"
+                                            placeholder="Teks opsi jawaban..."
+                                          />
+                                          <button
+                                            onClick={() => {
+                                              const updatedOpts = item.options?.filter((o) => o.id !== opt.id);
+                                              const selectedOptionIds = (updatedOpts || [])
+                                                .filter((o) => o.isCorrect)
+                                                .map((o) => o.id);
+
+                                              const existingAk = (activePackage.answerKeys || []).find(
+                                                (ak) => ak.instrumentId === writtenInst!.id && ak.instrumentItemId === item.id
+                                              );
+
+                                              let updatedAnswerKeys = activePackage.answerKeys || [];
+                                              if (selectedOptionIds.length > 0) {
+                                                const updatedAk: AssessmentAnswerKey = {
+                                                  ...(existingAk || {
+                                                    id: `ak-${writtenInst!.id}-${item.id}`,
+                                                    instrumentId: writtenInst!.id,
+                                                    instrumentItemId: item.id,
+                                                  }),
+                                                  instrumentId: writtenInst!.id,
+                                                  instrumentItemId: item.id,
+                                                  answerType: item.itemType === 'MULTIPLE_CHOICE' ? 'OPTION' : 'MULTIPLE_OPTION',
+                                                  optionIds: selectedOptionIds,
+                                                };
+                                                updatedAnswerKeys = existingAk
+                                                  ? (activePackage.answerKeys || []).map((ak) => (ak.id === existingAk.id ? updatedAk : ak))
+                                                  : [...(activePackage.answerKeys || []), updatedAk];
+                                              } else if (existingAk) {
+                                                updatedAnswerKeys = (activePackage.answerKeys || []).filter(
+                                                  (ak) => ak.id !== existingAk.id
+                                                );
+                                              }
+
+                                              const updatedItems = writtenInst!.items.map((it) =>
+                                                it.id === item.id ? { ...it, options: updatedOpts } : it
+                                              );
+                                              const updatedInstruments = activePackage.instruments.map((inst) =>
+                                                inst.type === 'WRITTEN_TEST' ? { ...writtenInst!, items: updatedItems } : inst
+                                              );
+                                              updatePackage({
+                                                ...activePackage,
+                                                instruments: updatedInstruments,
+                                                answerKeys: updatedAnswerKeys,
+                                              });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 p-1"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
                                       );
-                                      const updatedInstruments = activePackage.instruments.map((inst) =>
-                                        inst.type === 'WRITTEN_TEST' ? { ...writtenInst!, items: updatedItems } : inst
-                                      );
-                                      updatePackage({ ...activePackage, instruments: updatedInstruments });
-                                    }}
-                                    className="text-xs text-blue-600 font-semibold hover:underline flex items-center gap-1 mt-1"
-                                  >
-                                    + Opsi Jawaban
-                                  </button>
-                                </div>
-                              )}
+                                    })}
+                                    <button
+                                      onClick={() => {
+                                        const newOptLabel = String.fromCharCode(65 + (item.options?.length || 0));
+                                        const newOpt: WrittenAssessmentOption = {
+                                          id: `opt-${Date.now()}`,
+                                          label: newOptLabel,
+                                          text: '',
+                                        };
+                                        const updatedOpts = [...(item.options || []), newOpt];
+                                        const updatedItems = writtenInst!.items.map((it) =>
+                                          it.id === item.id ? { ...it, options: updatedOpts } : it
+                                        );
+                                        const updatedInstruments = activePackage.instruments.map((inst) =>
+                                          inst.type === 'WRITTEN_TEST' ? { ...writtenInst!, items: updatedItems } : inst
+                                        );
+                                        updatePackage({ ...activePackage, instruments: updatedInstruments });
+                                      }}
+                                      className="text-xs text-blue-600 font-semibold hover:underline flex items-center gap-1 mt-1"
+                                    >
+                                      + Opsi Jawaban
+                                    </button>
+                                  </div>
+                                );
+                              })()}
 
                                {item.itemType === 'MATCHING' && (() => {
                                  const matchingKey = (activePackage.answerKeys || []).find(

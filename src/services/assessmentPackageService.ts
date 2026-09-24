@@ -322,7 +322,7 @@ export function validateAssessmentPackage(
             if (!item.prompt || item.prompt.trim() === '') {
               errors.push(`Soal tertulis #${itemIdx + 1} belum memiliki teks pertanyaan (prompt).`);
             }
-            if (item.itemType === 'MULTIPLE_CHOICE' || item.itemType === 'MULTIPLE_SELECT') {
+            if (item.itemType === 'MULTIPLE_CHOICE') {
               if (!item.options || item.options.length < 2) {
                 errors.push(`Soal pilihan ganda #${itemIdx + 1} wajib memiliki minimal 2 opsi jawaban.`);
               } else {
@@ -338,12 +338,80 @@ export function validateAssessmentPackage(
                   }
                 });
 
-                const hasCorrect = item.options.some((opt) => opt.isCorrect);
-                const hasAnswerKey = pkg.answerKeys.some(
-                  (ak) => ak.instrumentItemId === item.id && (ak.value || (ak.optionIds && ak.optionIds.length > 0))
+                const optIdSet = new Set(item.options.map((o) => o.id));
+
+                // Canonical AssessmentAnswerKey check:
+                const akKey = pkg.answerKeys.find(
+                  (ak) => ak.instrumentId === inst.id && ak.instrumentItemId === item.id && ak.answerType === 'OPTION'
                 );
-                if (!hasCorrect && !hasAnswerKey) {
-                  errors.push(`Soal pilihan ganda #${itemIdx + 1} belum menentukan kunci/opsi jawaban yang benar.`);
+
+                if (!akKey || !akKey.optionIds || akKey.optionIds.length === 0) {
+                  errors.push(`Soal pilihan ganda #${itemIdx + 1} belum memiliki AssessmentAnswerKey canonical.`);
+                } else if (akKey.optionIds.length !== 1) {
+                  errors.push(`Soal pilihan ganda #${itemIdx + 1} wajib memiliki tepat 1 opsi jawaban benar pada AssessmentAnswerKey.`);
+                } else if (!optIdSet.has(akKey.optionIds[0])) {
+                  errors.push(`Soal pilihan ganda #${itemIdx + 1} merujuk pada optionId [${akKey.optionIds[0]}] yang tidak ditemukan pada daftar opsi.`);
+                }
+
+                // Fail-closed against conflicting dual answer sources (legacy item.options.isCorrect vs AssessmentAnswerKey)
+                const legacyCorrectIds = item.options.filter((o) => o.isCorrect).map((o) => o.id);
+                if (legacyCorrectIds.length > 0 && akKey && akKey.optionIds && akKey.optionIds.length > 0) {
+                  const isConflicting =
+                    legacyCorrectIds.length !== akKey.optionIds.length ||
+                    legacyCorrectIds[0] !== akKey.optionIds[0];
+                  if (isConflicting) {
+                    errors.push(
+                      `Dual answer source conflict pada item [${item.id}]: opsi benar pada butir soal berbeda dengan AssessmentAnswerKey.optionIds.`
+                    );
+                  }
+                }
+              }
+            } else if (item.itemType === 'MULTIPLE_SELECT') {
+              if (!item.options || item.options.length < 2) {
+                errors.push(`Soal pilihan ganda kompleks #${itemIdx + 1} wajib memiliki minimal 2 opsi jawaban.`);
+              } else {
+                const seenOptIds = new Map<string, number>();
+                item.options.forEach((opt, optIdx) => {
+                  if (opt.id) {
+                    if (seenOptIds.has(opt.id)) {
+                      errors.push(
+                        `Soal pilihan ganda kompleks #${itemIdx + 1} memiliki ID opsi duplikat [${opt.id}] pada opsi #${optIdx + 1} (sama dengan opsi #${seenOptIds.get(opt.id)}).`
+                      );
+                    }
+                    seenOptIds.set(opt.id, optIdx + 1);
+                  }
+                });
+
+                const optIdSet = new Set(item.options.map((o) => o.id));
+
+                // Canonical AssessmentAnswerKey check:
+                const akKey = pkg.answerKeys.find(
+                  (ak) => ak.instrumentId === inst.id && ak.instrumentItemId === item.id && ak.answerType === 'MULTIPLE_OPTION'
+                );
+
+                if (!akKey || !akKey.optionIds || akKey.optionIds.length === 0) {
+                  errors.push(`Soal pilihan ganda kompleks #${itemIdx + 1} belum memiliki AssessmentAnswerKey canonical.`);
+                } else {
+                  akKey.optionIds.forEach((optId) => {
+                    if (!optIdSet.has(optId)) {
+                      errors.push(`Soal pilihan ganda kompleks #${itemIdx + 1} merujuk pada optionId [${optId}] yang tidak ditemukan pada daftar opsi.`);
+                    }
+                  });
+                }
+
+                // Fail-closed against conflicting dual answer sources (legacy item.options.isCorrect vs AssessmentAnswerKey)
+                const legacyCorrectIds = item.options.filter((o) => o.isCorrect).map((o) => o.id);
+                if (legacyCorrectIds.length > 0 && akKey && akKey.optionIds && akKey.optionIds.length > 0) {
+                  const sortedLegacy = [...legacyCorrectIds].sort();
+                  const sortedAk = [...akKey.optionIds].sort();
+                  const isConflicting =
+                    sortedLegacy.length !== sortedAk.length ||
+                    sortedLegacy.some((id, idx) => id !== sortedAk[idx]);
+                  if (isConflicting) {
+                    errors.push(
+                      `Dual answer source conflict pada item [${item.id}]: opsi benar pada butir soal berbeda dengan AssessmentAnswerKey.optionIds.`
+                    );
+                  }
                 }
               }
             } else if (item.itemType === 'MATCHING') {
@@ -653,6 +721,7 @@ export function validateAssessmentPackage(
     {
       instrumentId: string;
       instrumentType: string;
+      itemType?: string;
       options?: WrittenAssessmentOption[];
       matchingPremises?: MatchingAssessmentEntry[];
       matchingResponses?: MatchingAssessmentEntry[];
@@ -669,6 +738,7 @@ export function validateAssessmentPackage(
           allItemLookup.set(it.id, {
             instrumentId: inst.id,
             instrumentType: 'WRITTEN_TEST',
+            itemType: it.itemType,
             options: it.options,
             matchingPremises: it.matchingPremises,
             matchingResponses: it.matchingResponses,
@@ -735,13 +805,40 @@ export function validateAssessmentPackage(
     }
 
     // 4. For OPTION / MULTIPLE_OPTION, optionIds check
-    if (ak.answerType === 'OPTION' || ak.answerType === 'MULTIPLE_OPTION') {
+    if (ak.answerType === 'OPTION') {
+      if (itemMeta.itemType === 'MULTIPLE_SELECT') {
+        errors.push(
+          `Kunci jawaban #${akIdx + 1} bertipe OPTION tidak sesuai dengan jenis butir pilihan ganda kompleks (MULTIPLE_SELECT).`
+        );
+      }
       if (!itemMeta.options || itemMeta.options.length === 0) {
         errors.push(
           `Kunci jawaban #${akIdx + 1} bertipe pilihan opsi, tetapi butir instrumen tidak memiliki daftar opsi pilihan.`
         );
       } else if (!ak.optionIds || ak.optionIds.length === 0) {
-        errors.push(`Kunci jawaban #${akIdx + 1} bertipe pilihan opsi tetapi tidak mencantumkan optionIds.`);
+        errors.push(`Kunci jawaban #${akIdx + 1} bertipe OPTION tetapi tidak mencantumkan optionIds.`);
+      } else if (ak.optionIds.length !== 1) {
+        errors.push(`Kunci jawaban pilihan ganda #${akIdx + 1} (OPTION) wajib memiliki tepat 1 opsi jawaban benar.`);
+      } else {
+        const validOptIds = new Set(itemMeta.options.map((o) => o.id));
+        if (!validOptIds.has(ak.optionIds[0])) {
+          errors.push(
+            `Kunci jawaban #${akIdx + 1} merujuk pada opsi ID [${ak.optionIds[0]}] yang tidak ada pada pilihan butir soal.`
+          );
+        }
+      }
+    } else if (ak.answerType === 'MULTIPLE_OPTION') {
+      if (itemMeta.itemType === 'MULTIPLE_CHOICE') {
+        errors.push(
+          `Kunci jawaban #${akIdx + 1} bertipe MULTIPLE_OPTION tidak sesuai dengan jenis butir pilihan ganda tunggal (MULTIPLE_CHOICE).`
+        );
+      }
+      if (!itemMeta.options || itemMeta.options.length === 0) {
+        errors.push(
+          `Kunci jawaban #${akIdx + 1} bertipe pilihan opsi, tetapi butir instrumen tidak memiliki daftar opsi pilihan.`
+        );
+      } else if (!ak.optionIds || ak.optionIds.length === 0) {
+        errors.push(`Kunci jawaban #${akIdx + 1} bertipe MULTIPLE_OPTION tetapi tidak mencantumkan optionIds (optionIds kosong).`);
       } else {
         const validOptIds = new Set(itemMeta.options.map((o) => o.id));
         ak.optionIds.forEach((optId) => {
