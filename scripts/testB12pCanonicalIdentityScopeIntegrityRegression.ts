@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { validateAssessmentPackage, invalidateAssessmentPackageDependencies } from '../src/services/assessmentPackageService';
+import { buildNormalizedAssessmentDocumentModel } from '../src/services/documentEngine/assessmentExportService';
 import type {
   AssessmentPackage,
   WrittenAssessmentInstrument,
@@ -14,6 +15,7 @@ import type {
   AssessmentRubric,
   AssessmentScoringGuide,
   AssessmentAnswerKey,
+  AssessmentDocumentSnapshot,
 } from '../src/types';
 
 let passed = 0;
@@ -942,30 +944,60 @@ console.log('=== B.1.2p Canonical ID, Reference & Scope Integrity Regression Tes
   assert(res.valid, 'Test 44: Workspace match passes validation');
 }
 
-// Test 45: Preservation B.1.2m - Exact item number & option ID integrity
+// Test 45: Preservation B.1.2m - Exact item number linkage in buildNormalizedAssessmentDocumentModel
 {
   const pkg = createValidPackage();
   const writtenInst = pkg.instruments[0] as WrittenAssessmentInstrument;
-  const mcItem = writtenInst.items![0];
-  const akMc = pkg.answerKeys[0];
+  // Override item order to 5 (different from array index 0)
+  writtenInst.items![0].order = 5;
 
-  assert(akMc.instrumentItemId === mcItem.id, 'Test 45: Answer key points to valid item ID');
-  assert(akMc.optionIds !== undefined && akMc.optionIds[0] === 'opt-a', 'Test 45: Answer key option ID preserved');
+  const snapshot: AssessmentDocumentSnapshot = {
+    snapshotId: 'snap-test-b12m',
+    mode: 'CANONICAL_PACKAGE',
+    documentType: 'ASESMEN',
+    documentDate: '2026-09-24',
+    formattedDocumentDate: 'Surakarta, 24 September 2026',
+    assessmentPlanId: pkg.assessmentPlanId,
+    assessmentPackageId: pkg.id,
+    assessmentPackageRevision: 1,
+    packageTitle: pkg.title,
+    schoolName: 'SD Negeri Percobaan',
+    teacherName: 'Guru Penjas',
+    academicYear: '2025/2026',
+    semester: '1 (Ganjil)',
+    grade: 'Kelas 10',
+    subject: 'PJOK',
+    curriculum: 'Kurikulum Merdeka',
+    documentMode: 'data',
+    generatedAt: new Date().toISOString(),
+    blueprintItems: pkg.blueprintItems,
+    instruments: pkg.instruments,
+    answerKeys: pkg.answerKeys,
+    scoringGuides: pkg.scoringGuides,
+    rubrics: pkg.rubrics,
+    resolvedObjectives: {},
+  };
 
-  const res = validateAssessmentPackage(pkg, mockContext);
-  assert(res.valid, 'Test 45: Valid B.1.2m package with answer key option IDs passes');
+  const model = buildNormalizedAssessmentDocumentModel(snapshot);
+  assert(
+    model.answerKeys.list.length > 0 && model.answerKeys.list[0].itemNumber === 5,
+    'Test 45: Preservation B.1.2m - Normalized answer key preserves exact linked item order (5) instead of array index'
+  );
 }
 
-// Test 46: Preservation B.1.2n - ESSAY AnswerKey SSOT integrity
+// Test 46: Preservation B.1.2n - MULTIPLE_CHOICE without AssessmentAnswerKey canonical fails validation
 {
   const pkg = createValidPackage();
-  // Remove ESSAY answer key
-  pkg.answerKeys = pkg.answerKeys.filter((ak) => ak.instrumentItemId !== 'item-essay-1');
+  const writtenInst = pkg.instruments[0] as WrittenAssessmentInstrument;
+  // Set legacy isCorrect on option, but remove canonical AssessmentAnswerKey for this item
+  writtenInst.items![0].options![0].isCorrect = true;
+  pkg.answerKeys = pkg.answerKeys.filter((ak) => ak.instrumentItemId !== 'item-mc-1');
+
   const res = validateAssessmentPackage(pkg, mockContext);
-  assert(!res.valid, 'Test 46: ESSAY item without AnswerKey fails validation');
+  assert(!res.valid, 'Test 46: Preservation B.1.2n - MULTIPLE_CHOICE without canonical AssessmentAnswerKey fails validation');
   assert(
-    res.errors.some((e) => e.includes('kunci/rambu jawaban canonical') || e.includes('Kunci jawaban')),
-    'Test 46: Contains missing ESSAY answer key error message'
+    res.errors.some((e) => e.includes('belum memiliki AssessmentAnswerKey canonical')),
+    'Test 46: Contains canonical answer key requirement error message'
   );
 }
 
