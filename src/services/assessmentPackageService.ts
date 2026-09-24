@@ -773,7 +773,20 @@ export function validateAssessmentPackage(
     }
   });
 
+  const seenAnswerKeyTargets = new Set<string>();
+
   pkg.answerKeys.forEach((ak, akIdx) => {
+    // 0. Duplicate AnswerKey guard (1 instrumentId + 1 instrumentItemId = max 1 key)
+    if (ak.instrumentId && ak.instrumentItemId) {
+      const targetKey = `${ak.instrumentId}::${ak.instrumentItemId}`;
+      if (seenAnswerKeyTargets.has(targetKey)) {
+        errors.push(
+          `Terdapat lebih dari satu AssessmentAnswerKey canonical untuk instrumen [${ak.instrumentId}] item [${ak.instrumentItemId}].`
+        );
+      }
+      seenAnswerKeyTargets.add(targetKey);
+    }
+
     // 1. instrumentId must resolve to canonical instrument
     if (!ak.instrumentId || !instrumentMap.has(ak.instrumentId)) {
       errors.push(

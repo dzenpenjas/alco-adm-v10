@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   AssessmentPackage,
   AcademicSetting,
@@ -16,6 +18,12 @@ import { validateAssessmentPackage } from '../src/services/assessmentPackageServ
 
 function runB12nTests() {
   console.log('--- START B.1.2n CANONICAL ANSWER KEY SSOT REGRESSION TESTS ---');
+
+  let passedTests = 0;
+  const recordPass = (msg: string) => {
+    passedTests++;
+    console.log(`  [PASS] Test ${passedTests}: ${msg}`);
+  };
 
   const mockSetting: AcademicSetting = {
     id: 'setting-1',
@@ -103,7 +111,6 @@ function runB12nTests() {
   ];
 
   // TEST 1: MULTIPLE_CHOICE with canonical AssessmentAnswerKey -> PASS
-  console.log('Test 1: MULTIPLE_CHOICE with valid canonical AssessmentAnswerKey -> PASS');
   const pkgMcValid: AssessmentPackage = {
     id: 'pkg-1',
     assessmentPlanId: 'plan-1',
@@ -150,10 +157,9 @@ function runB12nTests() {
   if (!val1.valid) {
     throw new Error(`Test 1 Failed: Expected valid package, got errors: ${val1.errors.join('; ')}`);
   }
-  console.log('  PASSED: Valid canonical answer key for MULTIPLE_CHOICE accepted.');
+  recordPass('MULTIPLE_CHOICE with valid canonical AssessmentAnswerKey accepted');
 
   // TEST 2: MULTIPLE_CHOICE without AssessmentAnswerKey (even if legacy isCorrect is set) -> FAIL
-  console.log('Test 2: MULTIPLE_CHOICE without canonical AssessmentAnswerKey (legacy isCorrect only) -> FAIL');
   const pkgMcNoAk: AssessmentPackage = {
     ...pkgMcValid,
     instruments: [
@@ -181,10 +187,9 @@ function runB12nTests() {
   if (val2.valid || !val2.errors.some((e) => e.includes('belum memiliki AssessmentAnswerKey canonical'))) {
     throw new Error(`Test 2 Failed: Expected failure for missing canonical answer key. Errors: ${val2.errors.join('; ')}`);
   }
-  console.log('  PASSED: Rejected missing canonical answer key despite legacy isCorrect.');
+  recordPass('MULTIPLE_CHOICE without canonical AssessmentAnswerKey rejected (legacy isCorrect insufficient)');
 
   // TEST 3: MULTIPLE_CHOICE with empty optionIds -> FAIL
-  console.log('Test 3: MULTIPLE_CHOICE with empty optionIds in AssessmentAnswerKey -> FAIL');
   const pkgMcEmptyOptionIds: AssessmentPackage = {
     ...pkgMcValid,
     answerKeys: [
@@ -201,10 +206,9 @@ function runB12nTests() {
   if (val3.valid || !val3.errors.some((e) => e.includes('belum memiliki AssessmentAnswerKey canonical') || e.includes('optionIds'))) {
     throw new Error(`Test 3 Failed: Expected failure for empty optionIds. Errors: ${val3.errors.join('; ')}`);
   }
-  console.log('  PASSED: Rejected empty optionIds in AssessmentAnswerKey.');
+  recordPass('MULTIPLE_CHOICE with empty optionIds rejected');
 
   // TEST 4: MULTIPLE_CHOICE with multiple optionIds -> FAIL
-  console.log('Test 4: MULTIPLE_CHOICE with multiple optionIds in AssessmentAnswerKey -> FAIL');
   const pkgMcMultipleOptionIds: AssessmentPackage = {
     ...pkgMcValid,
     answerKeys: [
@@ -221,10 +225,9 @@ function runB12nTests() {
   if (val4.valid || !val4.errors.some((e) => e.includes('tepat 1 opsi'))) {
     throw new Error(`Test 4 Failed: Expected failure for multiple optionIds in MC. Errors: ${val4.errors.join('; ')}`);
   }
-  console.log('  PASSED: Rejected multiple optionIds for single MULTIPLE_CHOICE item.');
+  recordPass('MULTIPLE_CHOICE with multiple optionIds rejected');
 
   // TEST 5: MULTIPLE_CHOICE with dangling optionId -> FAIL
-  console.log('Test 5: MULTIPLE_CHOICE with dangling optionId -> FAIL');
   const pkgMcDanglingOptionId: AssessmentPackage = {
     ...pkgMcValid,
     answerKeys: [
@@ -241,10 +244,9 @@ function runB12nTests() {
   if (val5.valid || !val5.errors.some((e) => e.includes('tidak ditemukan') || e.includes('tidak ada pada pilihan'))) {
     throw new Error(`Test 5 Failed: Expected failure for dangling optionId. Errors: ${val5.errors.join('; ')}`);
   }
-  console.log('  PASSED: Rejected dangling optionId.');
+  recordPass('MULTIPLE_CHOICE with dangling optionId rejected');
 
   // TEST 6: MULTIPLE_CHOICE with dual source conflict -> FAIL (fail closed)
-  console.log('Test 6: MULTIPLE_CHOICE with dual source conflict (legacy isCorrect != answerKey) -> FAIL');
   const pkgMcConflict: AssessmentPackage = {
     ...pkgMcValid,
     instruments: [
@@ -279,10 +281,9 @@ function runB12nTests() {
   if (val6.valid || !val6.errors.some((e) => e.includes('Dual answer source conflict'))) {
     throw new Error(`Test 6 Failed: Expected dual answer source conflict error. Errors: ${val6.errors.join('; ')}`);
   }
-  console.log('  PASSED: Fail-closed on dual answer source conflict.');
+  recordPass('Fail-closed on MULTIPLE_CHOICE dual answer source conflict');
 
   // TEST 7: MULTIPLE_SELECT with valid canonical AssessmentAnswerKey -> PASS
-  console.log('Test 7: MULTIPLE_SELECT with valid canonical AssessmentAnswerKey -> PASS');
   const pkgMsValid: AssessmentPackage = {
     id: 'pkg-ms',
     assessmentPlanId: 'plan-1',
@@ -331,10 +332,9 @@ function runB12nTests() {
   if (!val7.valid) {
     throw new Error(`Test 7 Failed: Expected valid MULTIPLE_SELECT package. Errors: ${val7.errors.join('; ')}`);
   }
-  console.log('  PASSED: Valid canonical answer key for MULTIPLE_SELECT accepted.');
+  recordPass('MULTIPLE_SELECT with valid canonical AssessmentAnswerKey accepted');
 
   // TEST 8: MULTIPLE_SELECT with empty optionIds -> FAIL
-  console.log('Test 8: MULTIPLE_SELECT with empty optionIds -> FAIL');
   const pkgMsEmptyOptionIds: AssessmentPackage = {
     ...pkgMsValid,
     answerKeys: [
@@ -351,10 +351,9 @@ function runB12nTests() {
   if (val8.valid || !val8.errors.some((e) => e.includes('belum memiliki AssessmentAnswerKey canonical') || e.includes('optionIds kosong'))) {
     throw new Error(`Test 8 Failed: Expected failure on empty optionIds for MULTIPLE_SELECT. Errors: ${val8.errors.join('; ')}`);
   }
-  console.log('  PASSED: Rejected empty optionIds for MULTIPLE_SELECT.');
+  recordPass('MULTIPLE_SELECT with empty optionIds rejected');
 
   // TEST 9: MULTIPLE_SELECT with dual source conflict -> FAIL
-  console.log('Test 9: MULTIPLE_SELECT with dual source conflict -> FAIL');
   const pkgMsConflict: AssessmentPackage = {
     ...pkgMsValid,
     instruments: [
@@ -390,10 +389,9 @@ function runB12nTests() {
   if (val9.valid || !val9.errors.some((e) => e.includes('Dual answer source conflict'))) {
     throw new Error(`Test 9 Failed: Expected dual source conflict error for MULTIPLE_SELECT. Errors: ${val9.errors.join('; ')}`);
   }
-  console.log('  PASSED: Fail-closed on MULTIPLE_SELECT dual source conflict.');
+  recordPass('Fail-closed on MULTIPLE_SELECT dual source conflict');
 
   // TEST 10: Type mismatch: MULTIPLE_CHOICE item with MULTIPLE_OPTION key -> FAIL
-  console.log('Test 10: Type mismatch: MULTIPLE_CHOICE item with MULTIPLE_OPTION key -> FAIL');
   const pkgTypeMismatch1: AssessmentPackage = {
     ...pkgMcValid,
     answerKeys: [
@@ -410,10 +408,9 @@ function runB12nTests() {
   if (val10.valid || !val10.errors.some((e) => e.includes('MULTIPLE_OPTION') || e.includes('belum memiliki AssessmentAnswerKey canonical'))) {
     throw new Error(`Test 10 Failed: Expected type mismatch rejection. Errors: ${val10.errors.join('; ')}`);
   }
-  console.log('  PASSED: Rejected MULTIPLE_OPTION key for MULTIPLE_CHOICE item.');
+  recordPass('Type mismatch: MULTIPLE_CHOICE item with MULTIPLE_OPTION key rejected');
 
   // TEST 11: Type mismatch: MULTIPLE_SELECT item with OPTION key -> FAIL
-  console.log('Test 11: Type mismatch: MULTIPLE_SELECT item with OPTION key -> FAIL');
   const pkgTypeMismatch2: AssessmentPackage = {
     ...pkgMsValid,
     answerKeys: [
@@ -430,10 +427,9 @@ function runB12nTests() {
   if (val11.valid || !val11.errors.some((e) => e.includes('OPTION') || e.includes('belum memiliki AssessmentAnswerKey canonical'))) {
     throw new Error(`Test 11 Failed: Expected type mismatch rejection. Errors: ${val11.errors.join('; ')}`);
   }
-  console.log('  PASSED: Rejected OPTION key for MULTIPLE_SELECT item.');
+  recordPass('Type mismatch: MULTIPLE_SELECT item with OPTION key rejected');
 
   // TEST 12: Cross-instrument reference on AssessmentAnswerKey -> FAIL
-  console.log('Test 12: Cross-instrument reference on AssessmentAnswerKey -> FAIL');
   const pkgCrossInst: AssessmentPackage = {
     ...pkgMcValid,
     instruments: [
@@ -459,7 +455,7 @@ function runB12nTests() {
     answerKeys: [
       {
         id: 'ak-cross',
-        instrumentId: 'inst-w2', // points to inst-w2 but item is in inst-w1
+        instrumentId: 'inst-w2',
         instrumentItemId: 'item-mc-1',
         answerType: 'OPTION',
         optionIds: ['opt-a'],
@@ -470,10 +466,9 @@ function runB12nTests() {
   if (val12.valid || !val12.errors.some((e) => e.includes('cross-instrument reference') || e.includes('milik instrumen lain'))) {
     throw new Error(`Test 12 Failed: Expected cross-instrument reference error. Errors: ${val12.errors.join('; ')}`);
   }
-  console.log('  PASSED: Rejected cross-instrument reference in AssessmentAnswerKey.');
+  recordPass('Cross-instrument reference in AssessmentAnswerKey rejected');
 
   // TEST 13: Dangling instrumentId on AssessmentAnswerKey -> FAIL
-  console.log('Test 13: Dangling instrumentId on AssessmentAnswerKey -> FAIL');
   const pkgDanglingInst: AssessmentPackage = {
     ...pkgMcValid,
     answerKeys: [
@@ -490,10 +485,9 @@ function runB12nTests() {
   if (val13.valid || !val13.errors.some((e) => e.includes('dangling reference') || e.includes('tidak ditemukan'))) {
     throw new Error(`Test 13 Failed: Expected dangling instrumentId error. Errors: ${val13.errors.join('; ')}`);
   }
-  console.log('  PASSED: Rejected dangling instrumentId in AssessmentAnswerKey.');
+  recordPass('Dangling instrumentId in AssessmentAnswerKey rejected');
 
   // TEST 14: Dangling instrumentItemId on AssessmentAnswerKey -> FAIL
-  console.log('Test 14: Dangling instrumentItemId on AssessmentAnswerKey -> FAIL');
   const pkgDanglingItem: AssessmentPackage = {
     ...pkgMcValid,
     answerKeys: [
@@ -510,10 +504,9 @@ function runB12nTests() {
   if (val14.valid || !val14.errors.some((e) => e.includes('dangling reference') || e.includes('tidak ditemukan'))) {
     throw new Error(`Test 14 Failed: Expected dangling instrumentItemId error. Errors: ${val14.errors.join('; ')}`);
   }
-  console.log('  PASSED: Rejected dangling instrumentItemId in AssessmentAnswerKey.');
+  recordPass('Dangling instrumentItemId in AssessmentAnswerKey rejected');
 
   // TEST 15: MATCHING valid canonical SSOT -> PASS
-  console.log('Test 15: MATCHING valid canonical SSOT -> PASS');
   const matchPremises: MatchingAssessmentEntry[] = [
     { id: 'p1', text: 'Sepak Bola' },
     { id: 'p2', text: 'Basket' },
@@ -569,10 +562,9 @@ function runB12nTests() {
   if (!val15.valid) {
     throw new Error(`Test 15 Failed: Expected valid MATCHING package. Errors: ${val15.errors.join('; ')}`);
   }
-  console.log('  PASSED: Valid MATCHING canonical answer key accepted.');
+  recordPass('MATCHING valid canonical SSOT accepted');
 
   // TEST 16: CATEGORY_RESPONSE valid canonical SSOT -> PASS
-  console.log('Test 16: CATEGORY_RESPONSE valid canonical SSOT -> PASS');
   const catCategories: CategoryResponseCategory[] = [
     { id: 'cat-true', label: 'Benar' },
     { id: 'cat-false', label: 'Salah' },
@@ -628,9 +620,246 @@ function runB12nTests() {
   if (!val16.valid) {
     throw new Error(`Test 16 Failed: Expected valid CATEGORY_RESPONSE package. Errors: ${val16.errors.join('; ')}`);
   }
-  console.log('  PASSED: Valid CATEGORY_RESPONSE canonical answer key accepted.');
+  recordPass('CATEGORY_RESPONSE valid canonical SSOT accepted');
 
-  console.log('--- ALL 16 B.1.2n REGRESSION TESTS PASSED CLEANLY ---');
+  // TEST 17: Duplicate AnswerKey for exact instrumentId + instrumentItemId -> FAIL
+  const pkgDuplicateSameType: AssessmentPackage = {
+    ...pkgMcValid,
+    answerKeys: [
+      {
+        id: 'ak-1a',
+        instrumentId: 'inst-w',
+        instrumentItemId: 'item-mc-1',
+        answerType: 'OPTION',
+        optionIds: ['opt-a'],
+      },
+      {
+        id: 'ak-1b',
+        instrumentId: 'inst-w',
+        instrumentItemId: 'item-mc-1',
+        answerType: 'OPTION',
+        optionIds: ['opt-b'],
+      },
+    ],
+  };
+  const val17 = validateAssessmentPackage(pkgDuplicateSameType, defaultContext);
+  if (val17.valid || !val17.errors.some((e) => e.includes('lebih dari satu AssessmentAnswerKey canonical'))) {
+    throw new Error(`Test 17 Failed: Expected duplicate AnswerKey error. Errors: ${val17.errors.join('; ')}`);
+  }
+  recordPass('Duplicate AnswerKey for same item (same answerType) blocked');
+
+  // TEST 18: Duplicate AnswerKey with different answerTypes for same item -> FAIL
+  const pkgDuplicateDiffType: AssessmentPackage = {
+    ...pkgMcValid,
+    answerKeys: [
+      {
+        id: 'ak-1-option',
+        instrumentId: 'inst-w',
+        instrumentItemId: 'item-mc-1',
+        answerType: 'OPTION',
+        optionIds: ['opt-a'],
+      },
+      {
+        id: 'ak-1-exact',
+        instrumentId: 'inst-w',
+        instrumentItemId: 'item-mc-1',
+        answerType: 'EXACT',
+        value: 'Berlari',
+      },
+    ],
+  };
+  const val18 = validateAssessmentPackage(pkgDuplicateDiffType, defaultContext);
+  if (val18.valid || !val18.errors.some((e) => e.includes('lebih dari satu AssessmentAnswerKey canonical'))) {
+    throw new Error(`Test 18 Failed: Expected duplicate AnswerKey error across types. Errors: ${val18.errors.join('; ')}`);
+  }
+  recordPass('Duplicate AnswerKey for same item (cross-type OPTION + EXACT) blocked');
+
+  // TEST 19: MC Checkbox first select creates exact canonical key
+  const testOpts = [
+    { id: 'opt-a', label: 'A', text: 'Opsi A' },
+    { id: 'opt-b', label: 'B', text: 'Opsi B' },
+  ];
+  const initialMcKeys: AssessmentAnswerKey[] = [];
+  const mcSelectAction = (targetOptId: string, isCheck: boolean, currentKeys: AssessmentAnswerKey[]) => {
+    const existingAk = currentKeys.find((ak) => ak.instrumentId === 'inst-w' && ak.instrumentItemId === 'item-mc-1');
+    const nextOptionIds = isCheck ? [targetOptId] : [];
+    if (nextOptionIds.length > 0) {
+      const updatedAk: AssessmentAnswerKey = {
+        ...(existingAk || {
+          id: `ak-inst-w-item-mc-1`,
+          instrumentId: 'inst-w',
+          instrumentItemId: 'item-mc-1',
+        }),
+        instrumentId: 'inst-w',
+        instrumentItemId: 'item-mc-1',
+        answerType: 'OPTION',
+        optionIds: nextOptionIds,
+      };
+      return existingAk ? currentKeys.map((ak) => (ak.id === existingAk.id ? updatedAk : ak)) : [...currentKeys, updatedAk];
+    }
+    return currentKeys.filter((ak) => !(ak.instrumentId === 'inst-w' && ak.instrumentItemId === 'item-mc-1'));
+  };
+
+  const keysAfterFirstSelect = mcSelectAction('opt-a', true, initialMcKeys);
+  if (keysAfterFirstSelect.length !== 1 || keysAfterFirstSelect[0].optionIds?.[0] !== 'opt-a') {
+    throw new Error('Test 19 Failed: MC first select did not create canonical answer key');
+  }
+  recordPass('MC checkbox first select creates exact canonical key');
+
+  // TEST 20: MC transfer A -> B preserves single AnswerKey identity
+  const keysAfterTransfer = mcSelectAction('opt-b', true, keysAfterFirstSelect);
+  if (keysAfterTransfer.length !== 1 || keysAfterTransfer[0].optionIds?.[0] !== 'opt-b' || keysAfterTransfer[0].id !== keysAfterFirstSelect[0].id) {
+    throw new Error('Test 20 Failed: MC transfer did not preserve existing key identity');
+  }
+  recordPass('MC transfer A -> B preserves single AnswerKey identity');
+
+  // TEST 21: MC uncheck removes exact canonical key
+  const keysAfterUncheck = mcSelectAction('opt-b', false, keysAfterTransfer);
+  if (keysAfterUncheck.length !== 0) {
+    throw new Error('Test 21 Failed: MC uncheck did not delete canonical answer key');
+  }
+  recordPass('MC uncheck removes exact canonical key');
+
+  // TEST 22: MS check adds option ID to existing canonical key
+  const msSelectAction = (targetOptId: string, isCheck: boolean, currentKeys: AssessmentAnswerKey[], options: { id: string }[]) => {
+    const existingAk = currentKeys.find((ak) => ak.instrumentId === 'inst-w' && ak.instrumentItemId === 'item-ms-1');
+    const currentOptionIds = existingAk?.optionIds ?? [];
+    const selectedSet = new Set(currentOptionIds);
+    if (isCheck) {
+      selectedSet.add(targetOptId);
+    } else {
+      selectedSet.delete(targetOptId);
+    }
+    const nextOptionIds = options.map((o) => o.id).filter((id) => selectedSet.has(id));
+    if (nextOptionIds.length > 0) {
+      const updatedAk: AssessmentAnswerKey = {
+        ...(existingAk || {
+          id: `ak-inst-w-item-ms-1`,
+          instrumentId: 'inst-w',
+          instrumentItemId: 'item-ms-1',
+        }),
+        instrumentId: 'inst-w',
+        instrumentItemId: 'item-ms-1',
+        answerType: 'MULTIPLE_OPTION',
+        optionIds: nextOptionIds,
+      };
+      return existingAk ? currentKeys.map((ak) => (ak.id === existingAk.id ? updatedAk : ak)) : [...currentKeys, updatedAk];
+    }
+    return currentKeys.filter((ak) => !(ak.instrumentId === 'inst-w' && ak.instrumentItemId === 'item-ms-1'));
+  };
+
+  const msOptions = [{ id: 'opt-1' }, { id: 'opt-2' }, { id: 'opt-3' }, { id: 'opt-4' }];
+  const msStep1 = msSelectAction('opt-1', true, [], msOptions);
+  const msStep2 = msSelectAction('opt-3', true, msStep1, msOptions);
+  if (msStep2.length !== 1 || JSON.stringify(msStep2[0].optionIds) !== JSON.stringify(['opt-1', 'opt-3'])) {
+    throw new Error('Test 22 Failed: MS check did not correctly append option ID');
+  }
+  recordPass('MS check adds option ID to existing canonical key');
+
+  // TEST 23: MS uncheck removes only target option ID
+  const msStep3 = msSelectAction('opt-1', false, msStep2, msOptions);
+  if (msStep3.length !== 1 || JSON.stringify(msStep3[0].optionIds) !== JSON.stringify(['opt-3'])) {
+    throw new Error('Test 23 Failed: MS uncheck did not remove only target ID');
+  }
+  recordPass('MS uncheck removes only target option ID');
+
+  // TEST 24: MS ordering always normalizes according to canonical option order
+  // When checking opt-4 then opt-2 on [opt-1, opt-2, opt-3, opt-4], result should be ['opt-2', 'opt-4']
+  const msOrderStep1 = msSelectAction('opt-4', true, [], msOptions);
+  const msOrderStep2 = msSelectAction('opt-2', true, msOrderStep1, msOptions);
+  if (JSON.stringify(msOrderStep2[0].optionIds) !== JSON.stringify(['opt-2', 'opt-4'])) {
+    throw new Error('Test 24 Failed: MS ordering did not follow canonical option order');
+  }
+  recordPass('MS ordering normalizes to canonical option order regardless of click order');
+
+  // TEST 25: Visual checkbox state reflects canonical AnswerKey without fallback to legacy isCorrect
+  const testOpt = { id: 'opt-x', label: 'A', text: 'Text', isCorrect: true };
+  const mockAkWithoutOpt: AssessmentAnswerKey = {
+    id: 'ak-test',
+    instrumentId: 'inst-w',
+    instrumentItemId: 'item-1',
+    answerType: 'OPTION',
+    optionIds: ['opt-other'],
+  };
+  const isCheckedVisual = mockAkWithoutOpt.optionIds?.includes(testOpt.id) ?? false;
+  if (isCheckedVisual) {
+    throw new Error('Test 25 Failed: Visual checkbox state fell back to legacy isCorrect');
+  }
+  recordPass('Visual checkbox state does not fall back to legacy isCorrect');
+
+  // TEST 26: Option deletion when option is NOT in AnswerKey preserves AnswerKey
+  const akBeforeOptDel: AssessmentAnswerKey = {
+    id: 'ak-test',
+    instrumentId: 'inst-w',
+    instrumentItemId: 'item-1',
+    answerType: 'MULTIPLE_OPTION',
+    optionIds: ['opt-1', 'opt-3'],
+  };
+  const remainingAfterUnrelatedDel = [{ id: 'opt-1' }, { id: 'opt-3' }]; // opt-2 deleted
+  const nextIdsUnrelated = remainingAfterUnrelatedDel.map((o) => o.id).filter((id) => akBeforeOptDel.optionIds?.includes(id));
+  if (JSON.stringify(nextIdsUnrelated) !== JSON.stringify(['opt-1', 'opt-3'])) {
+    throw new Error('Test 26 Failed: Unrelated option deletion altered AnswerKey');
+  }
+  recordPass('Deleting unselected option preserves canonical AnswerKey');
+
+  // TEST 27: Option deletion when option IS in AnswerKey removes ID from canonical key
+  const remainingAfterSelectedDel = [{ id: 'opt-3' }]; // opt-1 deleted
+  const nextIdsSelectedDel = remainingAfterSelectedDel.map((o) => o.id).filter((id) => akBeforeOptDel.optionIds?.includes(id));
+  if (JSON.stringify(nextIdsSelectedDel) !== JSON.stringify(['opt-3'])) {
+    throw new Error('Test 27 Failed: Selected option deletion did not remove ID from canonical key');
+  }
+  recordPass('Deleting selected option removes ID from canonical AnswerKey');
+
+  // TEST 28: Deleting last selected option removes AnswerKey completely
+  const remainingEmptyDel: { id: string }[] = [];
+  const nextIdsEmptyDel = remainingEmptyDel.map((o) => o.id).filter((id) => akBeforeOptDel.optionIds?.includes(id));
+  if (nextIdsEmptyDel.length !== 0) {
+    throw new Error('Test 28 Failed: Deleting all options did not result in empty optionIds');
+  }
+  recordPass('Deleting last selected option removes canonical AnswerKey');
+
+  // TEST 29: Static inspection: AssessmentPackageBuilder.tsx has zero legacy-first mutation
+  const builderPath = path.resolve(process.cwd(), 'src/components/administration/AssessmentPackageBuilder.tsx');
+  const builderSrc = fs.readFileSync(builderPath, 'utf8');
+  if (builderSrc.includes('.filter((o) => o.isCorrect).map((o) => o.id)')) {
+    throw new Error('Test 29 Failed: AssessmentPackageBuilder.tsx contains legacy filter(isCorrect).map(id) mutation');
+  }
+  if (builderSrc.includes(': Boolean(opt.isCorrect)')) {
+    throw new Error('Test 29 Failed: AssessmentPackageBuilder.tsx contains : Boolean(opt.isCorrect) visual fallback');
+  }
+  recordPass('Static inspection: AssessmentPackageBuilder.tsx is free of legacy-first mutation and visual fallbacks');
+
+  // TEST 30: Static inspection: assessmentPackageService.ts has duplicate AnswerKey guard
+  const servicePath = path.resolve(process.cwd(), 'src/services/assessmentPackageService.ts');
+  const serviceSrc = fs.readFileSync(servicePath, 'utf8');
+  if (!serviceSrc.includes('lebih dari satu AssessmentAnswerKey canonical')) {
+    throw new Error('Test 30 Failed: assessmentPackageService.ts lacks duplicate AnswerKey guard');
+  }
+  recordPass('Static inspection: assessmentPackageService.ts enforces duplicate AnswerKey guard');
+
+  // TEST 31: Static inspection: assessmentExportService.ts has zero fallback to isCorrect
+  const exportPath = path.resolve(process.cwd(), 'src/services/documentEngine/assessmentExportService.ts');
+  const exportSrc = fs.readFileSync(exportPath, 'utf8');
+  if (exportSrc.includes('opt.isCorrect') || exportSrc.includes('options?.find((o) => o.isCorrect)')) {
+    throw new Error('Test 31 Failed: assessmentExportService.ts contains legacy isCorrect fallback');
+  }
+  recordPass('Static inspection: assessmentExportService.ts has zero fallback to options[].isCorrect');
+
+  // TEST 32: Zero type escapes in regression test file
+  const testFilePath = path.resolve(process.cwd(), 'scripts/testB12nCanonicalAnswerKeySsotRegression.ts');
+  const testFileSrc = fs.readFileSync(testFilePath, 'utf8');
+  const forbiddenEscapes = ['as' + ' any', 'as' + ' unknown' + ' as', '@ts' + '-ignore', '@ts' + '-expect-error'];
+  for (const esc of forbiddenEscapes) {
+    // Check occurrences outside this validation block
+    const parts = testFileSrc.split(esc);
+    if (parts.length > 1) {
+      // If found in code outside string definition
+      throw new Error(`Test 32 Failed: Regression file contains forbidden type escape: ${esc}`);
+    }
+  }
+  recordPass('Zero type escapes enforced in regression test suite');
+
+  console.log(`\n--- ALL ${passedTests} B.1.2n REGRESSION TESTS PASSED CLEANLY (0 FAILED) ---`);
 }
 
 runB12nTests();

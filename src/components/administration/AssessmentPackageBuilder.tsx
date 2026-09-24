@@ -1281,9 +1281,7 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
                                       <p className="text-xs text-slate-400 italic">Belum ada opsi jawaban. Klik tombol di bawah untuk menambahkan opsi.</p>
                                     )}
                                     {(item.options || []).map((opt) => {
-                                      const isChecked = optAnswerKey && optAnswerKey.optionIds
-                                        ? optAnswerKey.optionIds.includes(opt.id)
-                                        : Boolean(opt.isCorrect);
+                                      const isChecked = optAnswerKey?.optionIds?.includes(opt.id) ?? false;
 
                                       return (
                                         <div key={opt.id} className="flex items-center gap-2">
@@ -1292,22 +1290,28 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
                                             checked={isChecked}
                                             onChange={(e) => {
                                               const isCheck = e.target.checked;
-                                              const updatedOpts = item.options?.map((o) => {
-                                                if (item.itemType === 'MULTIPLE_CHOICE') {
-                                                  return o.id === opt.id ? { ...o, isCorrect: isCheck } : { ...o, isCorrect: false };
-                                                }
-                                                return o.id === opt.id ? { ...o, isCorrect: isCheck } : o;
-                                              });
-                                              const selectedOptionIds = (updatedOpts || [])
-                                                .filter((o) => o.isCorrect)
-                                                .map((o) => o.id);
-
                                               const existingAk = (activePackage.answerKeys || []).find(
                                                 (ak) => ak.instrumentId === writtenInst!.id && ak.instrumentItemId === item.id
                                               );
 
+                                              let nextOptionIds: string[];
+                                              if (item.itemType === 'MULTIPLE_CHOICE') {
+                                                nextOptionIds = isCheck ? [opt.id] : [];
+                                              } else {
+                                                const currentOptionIds = existingAk?.optionIds ?? [];
+                                                const selectedSet = new Set(currentOptionIds);
+                                                if (isCheck) {
+                                                  selectedSet.add(opt.id);
+                                                } else {
+                                                  selectedSet.delete(opt.id);
+                                                }
+                                                nextOptionIds = (item.options || [])
+                                                  .map((o) => o.id)
+                                                  .filter((id) => selectedSet.has(id));
+                                              }
+
                                               let updatedAnswerKeys: AssessmentAnswerKey[];
-                                              if (selectedOptionIds.length > 0) {
+                                              if (nextOptionIds.length > 0) {
                                                 const updatedAk: AssessmentAnswerKey = {
                                                   ...(existingAk || {
                                                     id: `ak-${writtenInst!.id}-${item.id}`,
@@ -1317,7 +1321,7 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
                                                   instrumentId: writtenInst!.id,
                                                   instrumentItemId: item.id,
                                                   answerType: item.itemType === 'MULTIPLE_CHOICE' ? 'OPTION' : 'MULTIPLE_OPTION',
-                                                  optionIds: selectedOptionIds,
+                                                  optionIds: nextOptionIds,
                                                 };
                                                 if (existingAk) {
                                                   updatedAnswerKeys = (activePackage.answerKeys || []).map((ak) =>
@@ -1331,6 +1335,12 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
                                                   (ak) => !(ak.instrumentId === writtenInst!.id && ak.instrumentItemId === item.id)
                                                 );
                                               }
+
+                                              // Mirror to legacy isCorrect for compatibility
+                                              const updatedOpts = item.options?.map((o) => ({
+                                                ...o,
+                                                isCorrect: nextOptionIds.includes(o.id),
+                                              }));
 
                                               const updatedItems = writtenInst!.items.map((it) =>
                                                 it.id === item.id ? { ...it, options: updatedOpts } : it
@@ -1364,17 +1374,17 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
                                           />
                                           <button
                                             onClick={() => {
-                                              const updatedOpts = item.options?.filter((o) => o.id !== opt.id);
-                                              const selectedOptionIds = (updatedOpts || [])
-                                                .filter((o) => o.isCorrect)
-                                                .map((o) => o.id);
-
                                               const existingAk = (activePackage.answerKeys || []).find(
                                                 (ak) => ak.instrumentId === writtenInst!.id && ak.instrumentItemId === item.id
                                               );
 
-                                              let updatedAnswerKeys = activePackage.answerKeys || [];
-                                              if (selectedOptionIds.length > 0) {
+                                              const remainingOpts = (item.options || []).filter((o) => o.id !== opt.id);
+                                              const nextOptionIds = remainingOpts
+                                                .map((o) => o.id)
+                                                .filter((id) => (existingAk?.optionIds || []).includes(id));
+
+                                              let updatedAnswerKeys: AssessmentAnswerKey[];
+                                              if (nextOptionIds.length > 0) {
                                                 const updatedAk: AssessmentAnswerKey = {
                                                   ...(existingAk || {
                                                     id: `ak-${writtenInst!.id}-${item.id}`,
@@ -1384,16 +1394,25 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
                                                   instrumentId: writtenInst!.id,
                                                   instrumentItemId: item.id,
                                                   answerType: item.itemType === 'MULTIPLE_CHOICE' ? 'OPTION' : 'MULTIPLE_OPTION',
-                                                  optionIds: selectedOptionIds,
+                                                  optionIds: nextOptionIds,
                                                 };
-                                                updatedAnswerKeys = existingAk
-                                                  ? (activePackage.answerKeys || []).map((ak) => (ak.id === existingAk.id ? updatedAk : ak))
-                                                  : [...(activePackage.answerKeys || []), updatedAk];
-                                              } else if (existingAk) {
+                                                if (existingAk) {
+                                                  updatedAnswerKeys = (activePackage.answerKeys || []).map((ak) =>
+                                                    ak.id === existingAk.id ? updatedAk : ak
+                                                  );
+                                                } else {
+                                                  updatedAnswerKeys = [...(activePackage.answerKeys || []), updatedAk];
+                                                }
+                                              } else {
                                                 updatedAnswerKeys = (activePackage.answerKeys || []).filter(
-                                                  (ak) => ak.id !== existingAk.id
+                                                  (ak) => !(ak.instrumentId === writtenInst!.id && ak.instrumentItemId === item.id)
                                                 );
                                               }
+
+                                              const updatedOpts = remainingOpts.map((o) => ({
+                                                ...o,
+                                                isCorrect: nextOptionIds.includes(o.id),
+                                              }));
 
                                               const updatedItems = writtenInst!.items.map((it) =>
                                                 it.id === item.id ? { ...it, options: updatedOpts } : it
