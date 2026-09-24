@@ -28,7 +28,8 @@
     "test:audit9c8:export": "tsx scripts/testAuditNo9C8DocumentExportRegression.ts",
     "test:regulatory2026": "tsx scripts/testAudit2026RegulatoryCompatibility.ts",
     "test:b12m": "tsx scripts/testB12mAnswerKeyExactItemNumberRegression.ts",
-    "test:b12n": "tsx scripts/testB12nCanonicalAnswerKeySsotRegression.ts"
+    "test:b12n": "tsx scripts/testB12nCanonicalAnswerKeySsotRegression.ts",
+    "test:b12o": "tsx scripts/testB12oScoringGuideEssayIntegrityRegression.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

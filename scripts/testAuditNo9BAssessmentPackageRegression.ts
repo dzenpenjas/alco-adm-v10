@@ -276,6 +276,12 @@ async function runRegressionTests() {
       { id: 'inst-w', type: 'WRITTEN_TEST', items: [{ id: 'q1', itemType: 'ESSAY', prompt: 'Jelaskan X', order: 1 }] },
       { id: 'inst-o', type: 'OBSERVATION', aspects: [{ id: 'obs-1', label: 'Sikap' }] },
     ],
+    answerKeys: [
+      { id: 'ak-q1', instrumentId: 'inst-w', instrumentItemId: 'q1', answerType: 'EXPECTED_RESPONSE', value: 'Rambu X' },
+    ],
+    scoringGuides: [
+      { id: 'sg-q1', title: 'Pedoman Uraian Q1', guideType: 'ESSAY', instrumentId: 'inst-w', instrumentItemId: 'q1', instructions: 'Petunjuk penskoran', maxScore: 10 },
+    ],
   };
   const valI = validateAssessmentPackage(validLinkedPkg, {
     academicSetting: mockMerdekaSetting,

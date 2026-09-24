@@ -3030,97 +3030,261 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
 
                 {/* PEDOMAN PENSKORAN SECTION */}
                 <div className="pt-6 border-t border-slate-200 space-y-4">
-                  <div>
-                    <h4 className="text-base font-bold text-slate-800 mb-1">Pedoman Penskoran</h4>
-                    <p className="text-xs text-slate-500">
-                      Pedoman penilaian dan penskoran untuk item/instrumen yang membutuhkan panduan penilaian khusus.
-                    </p>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="text-base font-bold text-slate-800 mb-1">Pedoman Penskoran</h4>
+                      <p className="text-xs text-slate-500">
+                        Pedoman penilaian dan penskoran untuk item/instrumen yang membutuhkan panduan penilaian khusus.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newGuide: AssessmentScoringGuide = {
+                          id: `sg-${Date.now()}`,
+                          title: '',
+                          guideType: 'MANUAL',
+                          instructions: '',
+                          maxScore: undefined,
+                        };
+                        updatePackage({
+                          ...activePackage,
+                          scoringGuides: [...(activePackage.scoringGuides || []), newGuide],
+                        });
+                      }}
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" /> Tambah Pedoman Penskoran
+                    </button>
                   </div>
 
                   {(!activePackage.scoringGuides || activePackage.scoringGuides.length === 0) ? (
                     <p className="text-slate-500 text-sm italic">Belum ada pedoman penskoran pada perangkat ini.</p>
                   ) : (
                     <div className="space-y-4">
-                      {activePackage.scoringGuides.map((guide) => (
-                        <div key={guide.id} className="p-4 border border-slate-200 rounded-lg bg-slate-50 space-y-3">
-                          <div className="flex justify-between items-center gap-2">
-                            <div className="flex-1">
-                              <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Judul Pedoman:</label>
-                              <input
-                                type="text"
-                                value={guide.title}
-                                onChange={(e) => {
-                                  const updatedGuides = activePackage.scoringGuides.map((g) =>
-                                    g.id === guide.id ? { ...g, title: e.target.value } : g
-                                  );
+                      {activePackage.scoringGuides.map((guide) => {
+                        const selectedInst = activePackage.instruments.find((i) => i.id === guide.instrumentId);
+
+                        let availableItems: { id: string; label: string; itemType?: string }[] = [];
+                        if (selectedInst) {
+                          if (selectedInst.type === 'WRITTEN_TEST') {
+                            const written = selectedInst as WrittenAssessmentInstrument;
+                            availableItems = (written.items || []).map((it, idx) => ({
+                              id: it.id,
+                              label: `Soal #${idx + 1} (${it.itemType || 'UNKNOWN'})${it.prompt ? `: ${it.prompt.slice(0, 30)}...` : ''}`,
+                              itemType: it.itemType,
+                            }));
+                          } else if (selectedInst.type === 'ORAL_TEST') {
+                            const oral = selectedInst as OralAssessmentInstrument;
+                            availableItems = (oral.items || []).map((it, idx) => ({
+                              id: it.id,
+                              label: `Pertanyaan #${idx + 1}${it.prompt ? `: ${it.prompt.slice(0, 30)}...` : ''}`,
+                            }));
+                          } else if (selectedInst.type === 'PERFORMANCE') {
+                            const perf = selectedInst as PerformanceAssessmentInstrument;
+                            availableItems = (perf.aspects || []).map((asp, idx) => ({
+                              id: asp.id,
+                              label: `Aspek #${idx + 1}: ${asp.label || asp.id}`,
+                            }));
+                          } else if (selectedInst.type === 'OBSERVATION') {
+                            const obs = selectedInst as ObservationAssessmentInstrument;
+                            availableItems = (obs.aspects || []).map((asp, idx) => ({
+                              id: asp.id,
+                              label: `Aspek #${idx + 1}: ${asp.label || asp.id}`,
+                            }));
+                          } else if (selectedInst.type === 'SELF_ASSESSMENT' || selectedInst.type === 'PEER_ASSESSMENT') {
+                            const sp = selectedInst as SelfPeerAssessmentInstrument;
+                            availableItems = (sp.items || []).map((it, idx) => ({
+                              id: it.id,
+                              label: `Pernyataan #${idx + 1}${it.statement ? `: ${it.statement.slice(0, 30)}...` : ''}`,
+                            }));
+                          }
+                        }
+
+                        return (
+                          <div key={guide.id} className="p-4 border border-slate-200 rounded-lg bg-slate-50 space-y-3">
+                            <div className="flex justify-between items-center gap-2">
+                              <div className="flex-1">
+                                <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Judul Pedoman:</label>
+                                <input
+                                  type="text"
+                                  value={guide.title}
+                                  onChange={(e) => {
+                                    const updatedGuides = activePackage.scoringGuides.map((g) =>
+                                      g.id === guide.id ? { ...g, title: e.target.value } : g
+                                    );
+                                    updatePackage({ ...activePackage, scoringGuides: updatedGuides });
+                                  }}
+                                  placeholder="Judul pedoman penskoran..."
+                                  className="font-bold text-sm bg-white p-1.5 border border-slate-300 rounded text-slate-800 w-full"
+                                />
+                              </div>
+                              <div className="w-48">
+                                <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Tipe Panduan (Read-Only):</label>
+                                <input
+                                  type="text"
+                                  readOnly
+                                  value={guide.guideType}
+                                  className="text-xs p-1.5 border border-slate-200 rounded bg-slate-100 text-slate-600 font-mono w-full cursor-not-allowed"
+                                />
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const updatedGuides = activePackage.scoringGuides.filter((g) => g.id !== guide.id);
                                   updatePackage({ ...activePackage, scoringGuides: updatedGuides });
                                 }}
-                                placeholder="Judul pedoman penskoran..."
-                                className="font-bold text-sm bg-white p-1.5 border border-slate-300 rounded text-slate-800 w-full"
-                              />
+                                className="text-red-500 hover:text-red-700 p-1 text-xs self-end mb-1"
+                                title="Hapus Pedoman Penskoran"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
-                            <div className="w-48">
-                              <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Tipe Panduan (Read-Only):</label>
-                              <input
-                                type="text"
-                                readOnly
-                                value={guide.guideType}
-                                className="text-xs p-1.5 border border-slate-200 rounded bg-slate-100 text-slate-600 font-mono w-full cursor-not-allowed"
-                              />
-                            </div>
-                          </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div className="md:col-span-2">
-                              <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Instruksi Penskoran:</label>
+                            {/* Linkage Selection Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white p-2.5 rounded border border-slate-200">
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Instrumen Terkait:</label>
+                                <select
+                                  value={guide.instrumentId || ''}
+                                  onChange={(e) => {
+                                    const nextInstId = e.target.value || undefined;
+                                    const nextInst = activePackage.instruments.find((i) => i.id === nextInstId);
+
+                                    let nextItemId = guide.instrumentItemId;
+                                    let isEssayItem = false;
+
+                                    if (nextInst && nextItemId) {
+                                      let itemFound = false;
+                                      if (nextInst.type === 'WRITTEN_TEST') {
+                                        const written = nextInst as WrittenAssessmentInstrument;
+                                        const item = written.items?.find((it) => it.id === nextItemId);
+                                        if (item) {
+                                          itemFound = true;
+                                          if (item.itemType === 'ESSAY') isEssayItem = true;
+                                        }
+                                      } else if (nextInst.type === 'ORAL_TEST') {
+                                        itemFound = (nextInst as OralAssessmentInstrument).items?.some((it) => it.id === nextItemId) || false;
+                                      } else if (nextInst.type === 'PERFORMANCE' || nextInst.type === 'OBSERVATION') {
+                                        itemFound = (nextInst as PerformanceAssessmentInstrument).aspects?.some((asp) => asp.id === nextItemId) || false;
+                                      } else if (nextInst.type === 'SELF_ASSESSMENT' || nextInst.type === 'PEER_ASSESSMENT') {
+                                        itemFound = (nextInst as SelfPeerAssessmentInstrument).items?.some((it) => it.id === nextItemId) || false;
+                                      }
+
+                                      if (!itemFound) {
+                                        nextItemId = undefined;
+                                      }
+                                    } else if (!nextInstId) {
+                                      nextItemId = undefined;
+                                    }
+
+                                    const nextGuideType = isEssayItem ? 'ESSAY' : guide.guideType === 'ESSAY' ? 'MANUAL' : guide.guideType;
+
+                                    const updatedGuides = activePackage.scoringGuides.map((g) =>
+                                      g.id === guide.id
+                                        ? { ...g, instrumentId: nextInstId, instrumentItemId: nextItemId, guideType: nextGuideType }
+                                        : g
+                                    );
+                                    updatePackage({ ...activePackage, scoringGuides: updatedGuides });
+                                  }}
+                                  className="text-xs p-1.5 border border-slate-300 rounded w-full bg-white font-medium"
+                                >
+                                  <option value="">-- Tanpa Instrumen Spesifik --</option>
+                                  {activePackage.instruments.map((inst) => (
+                                    <option key={inst.id} value={inst.id}>
+                                      {inst.type} ({inst.title || inst.id})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Butir Soal / Aspek Terkait:</label>
+                                <select
+                                  disabled={!guide.instrumentId}
+                                  value={guide.instrumentItemId || ''}
+                                  onChange={(e) => {
+                                    const nextItemId = e.target.value || undefined;
+                                    let isEssayItem = false;
+
+                                    if (selectedInst && nextItemId) {
+                                      if (selectedInst.type === 'WRITTEN_TEST') {
+                                        const item = (selectedInst as WrittenAssessmentInstrument).items?.find((it) => it.id === nextItemId);
+                                        if (item?.itemType === 'ESSAY') {
+                                          isEssayItem = true;
+                                        }
+                                      }
+                                    }
+
+                                    const nextGuideType = isEssayItem ? 'ESSAY' : guide.guideType === 'ESSAY' ? 'MANUAL' : guide.guideType;
+
+                                    const updatedGuides = activePackage.scoringGuides.map((g) =>
+                                      g.id === guide.id ? { ...g, instrumentItemId: nextItemId, guideType: nextGuideType } : g
+                                    );
+                                    updatePackage({ ...activePackage, scoringGuides: updatedGuides });
+                                  }}
+                                  className="text-xs p-1.5 border border-slate-300 rounded w-full bg-white font-medium disabled:bg-slate-100 disabled:text-slate-400"
+                                >
+                                  <option value="">-- Tanpa Butir Spesifik --</option>
+                                  {availableItems.map((it) => (
+                                    <option key={it.id} value={it.id}>
+                                      {it.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <div className="md:col-span-2">
+                                <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Instruksi Penskoran:</label>
+                                <textarea
+                                  rows={2}
+                                  value={guide.instructions || ''}
+                                  onChange={(e) => {
+                                    const updatedGuides = activePackage.scoringGuides.map((g) =>
+                                      g.id === guide.id ? { ...g, instructions: e.target.value || undefined } : g
+                                    );
+                                    updatePackage({ ...activePackage, scoringGuides: updatedGuides });
+                                  }}
+                                  placeholder="Petunjuk/instruksi pemberian skor..."
+                                  className="text-xs p-1.5 border border-slate-300 rounded w-full bg-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Skor Maksimal:</label>
+                                <input
+                                  type="number"
+                                  value={guide.maxScore !== undefined ? guide.maxScore : ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                    const updatedGuides = activePackage.scoringGuides.map((g) =>
+                                      g.id === guide.id ? { ...g, maxScore: val } : g
+                                    );
+                                    updatePackage({ ...activePackage, scoringGuides: updatedGuides });
+                                  }}
+                                  placeholder="Skor maks..."
+                                  className="text-xs p-1.5 border border-slate-300 rounded w-full bg-white"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Catatan Tambahan:</label>
                               <textarea
                                 rows={2}
-                                value={guide.instructions || ''}
+                                value={guide.notes || ''}
                                 onChange={(e) => {
                                   const updatedGuides = activePackage.scoringGuides.map((g) =>
-                                    g.id === guide.id ? { ...g, instructions: e.target.value || undefined } : g
+                                    g.id === guide.id ? { ...g, notes: e.target.value || undefined } : g
                                   );
                                   updatePackage({ ...activePackage, scoringGuides: updatedGuides });
                                 }}
-                                placeholder="Petunjuk/instruksi pemberian skor..."
-                                className="text-xs p-1.5 border border-slate-300 rounded w-full bg-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Skor Maksimal:</label>
-                              <input
-                                type="number"
-                                value={guide.maxScore !== undefined ? guide.maxScore : ''}
-                                onChange={(e) => {
-                                  const val = e.target.value === '' ? undefined : Number(e.target.value);
-                                  const updatedGuides = activePackage.scoringGuides.map((g) =>
-                                    g.id === guide.id ? { ...g, maxScore: val } : g
-                                  );
-                                  updatePackage({ ...activePackage, scoringGuides: updatedGuides });
-                                }}
-                                placeholder="Skor maks..."
+                                placeholder="Catatan tambahan penskoran (opsional)..."
                                 className="text-xs p-1.5 border border-slate-300 rounded w-full bg-white"
                               />
                             </div>
                           </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Catatan Tambahan:</label>
-                            <textarea
-                              rows={2}
-                              value={guide.notes || ''}
-                              onChange={(e) => {
-                                const updatedGuides = activePackage.scoringGuides.map((g) =>
-                                  g.id === guide.id ? { ...g, notes: e.target.value || undefined } : g
-                                );
-                                updatePackage({ ...activePackage, scoringGuides: updatedGuides });
-                              }}
-                              placeholder="Catatan tambahan penskoran (opsional)..."
-                              className="text-xs p-1.5 border border-slate-300 rounded w-full bg-white"
-                            />
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

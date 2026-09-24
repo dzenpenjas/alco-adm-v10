@@ -287,6 +287,65 @@ export function validateAssessmentPackage(
     });
   }
 
+  // Build canonical instrumentMap and allItemLookup
+  const instrumentMap = new Map<string, AssessmentInstrument>();
+  const allItemLookup = new Map<
+    string,
+    {
+      instrumentId: string;
+      instrumentType: string;
+      itemType?: string;
+      options?: WrittenAssessmentOption[];
+      matchingPremises?: MatchingAssessmentEntry[];
+      matchingResponses?: MatchingAssessmentEntry[];
+      categoryResponseStatements?: CategoryResponseStatement[];
+      categoryResponseCategories?: CategoryResponseCategory[];
+    }
+  >();
+
+  (pkg.instruments || []).forEach((inst) => {
+    instrumentMap.set(inst.id, inst);
+    switch (inst.type) {
+      case 'WRITTEN_TEST':
+        (inst as WrittenAssessmentInstrument).items?.forEach((it) => {
+          allItemLookup.set(it.id, {
+            instrumentId: inst.id,
+            instrumentType: 'WRITTEN_TEST',
+            itemType: it.itemType,
+            options: it.options,
+            matchingPremises: it.matchingPremises,
+            matchingResponses: it.matchingResponses,
+            categoryResponseStatements: it.categoryResponseStatements,
+            categoryResponseCategories: it.categoryResponseCategories,
+          });
+        });
+        break;
+      case 'ORAL_TEST':
+        (inst as OralAssessmentInstrument).items?.forEach((it) => {
+          allItemLookup.set(it.id, { instrumentId: inst.id, instrumentType: 'ORAL_TEST' });
+        });
+        break;
+      case 'PERFORMANCE':
+        (inst as PerformanceAssessmentInstrument).aspects?.forEach((asp) => {
+          allItemLookup.set(asp.id, { instrumentId: inst.id, instrumentType: 'PERFORMANCE' });
+        });
+        break;
+      case 'OBSERVATION':
+        (inst as ObservationAssessmentInstrument).aspects?.forEach((asp) => {
+          allItemLookup.set(asp.id, { instrumentId: inst.id, instrumentType: 'OBSERVATION' });
+        });
+        break;
+      case 'SELF_ASSESSMENT':
+      case 'PEER_ASSESSMENT':
+        (inst as SelfPeerAssessmentInstrument).items?.forEach((it) => {
+          allItemLookup.set(it.id, { instrumentId: inst.id, instrumentType: inst.type });
+        });
+        break;
+      default:
+        break;
+    }
+  });
+
   // 4. Instrument-Specific Validation
   const validRubricIds = new Set((pkg.rubrics || []).map((r) => r.id));
   const validScoringGuideIds = new Set((pkg.scoringGuides || []).map((sg) => sg.id));
@@ -625,6 +684,49 @@ export function validateAssessmentPackage(
               if (item.responseMode && item.responseMode !== 'SHORT_RESPONSE' && item.responseMode !== 'COMPLETION') {
                 errors.push(`Soal isian singkat #${itemIdx + 1} memiliki responseMode tidak valid [${item.responseMode}].`);
               }
+
+              const akSaKey = pkg.answerKeys.find(
+                (ak) =>
+                  ak.instrumentId === inst.id &&
+                  ak.instrumentItemId === item.id &&
+                  (ak.answerType === 'EXACT' || ak.answerType === 'EXPECTED_RESPONSE')
+              );
+
+              if (!akSaKey || !akSaKey.value || akSaKey.value.trim() === '') {
+                errors.push(`Soal isian singkat #${itemIdx + 1} belum memiliki kunci jawaban canonical.`);
+              }
+            } else if (item.itemType === 'ESSAY') {
+              // A. Canonical AnswerKey check (EXPECTED_RESPONSE with non-empty value)
+              const akExpKey = pkg.answerKeys.find(
+                (ak) =>
+                  ak.instrumentId === inst.id &&
+                  ak.instrumentItemId === item.id &&
+                  ak.answerType === 'EXPECTED_RESPONSE'
+              );
+
+              if (!akExpKey || !akExpKey.value || akExpKey.value.trim() === '') {
+                errors.push(`Soal uraian #${itemIdx + 1} belum memiliki kunci/rambu jawaban canonical.`);
+              }
+
+              // B. Canonical ScoringGuide check (ESSAY guideType with non-empty instructions & maxScore > 0)
+              const sgEssayKey = (pkg.scoringGuides || []).find(
+                (sg) =>
+                  sg.instrumentId === inst.id &&
+                  sg.instrumentItemId === item.id &&
+                  sg.guideType === 'ESSAY'
+              );
+
+              if (
+                !sgEssayKey ||
+                !sgEssayKey.instructions ||
+                sgEssayKey.instructions.trim() === '' ||
+                sgEssayKey.maxScore === undefined ||
+                typeof sgEssayKey.maxScore !== 'number' ||
+                !Number.isFinite(sgEssayKey.maxScore) ||
+                sgEssayKey.maxScore <= 0
+              ) {
+                errors.push(`Soal uraian #${itemIdx + 1} belum memiliki pedoman penskoran canonical yang valid.`);
+              }
             }
           });
         }
@@ -715,64 +817,6 @@ export function validateAssessmentPackage(
   });
 
   // 5. Answer Keys Referential Integrity (Fail Closed)
-  const instrumentMap = new Map<string, AssessmentInstrument>();
-  const allItemLookup = new Map<
-    string,
-    {
-      instrumentId: string;
-      instrumentType: string;
-      itemType?: string;
-      options?: WrittenAssessmentOption[];
-      matchingPremises?: MatchingAssessmentEntry[];
-      matchingResponses?: MatchingAssessmentEntry[];
-      categoryResponseStatements?: CategoryResponseStatement[];
-      categoryResponseCategories?: CategoryResponseCategory[];
-    }
-  >();
-
-  pkg.instruments.forEach((inst) => {
-    instrumentMap.set(inst.id, inst);
-    switch (inst.type) {
-      case 'WRITTEN_TEST':
-        (inst as WrittenAssessmentInstrument).items?.forEach((it) => {
-          allItemLookup.set(it.id, {
-            instrumentId: inst.id,
-            instrumentType: 'WRITTEN_TEST',
-            itemType: it.itemType,
-            options: it.options,
-            matchingPremises: it.matchingPremises,
-            matchingResponses: it.matchingResponses,
-            categoryResponseStatements: it.categoryResponseStatements,
-            categoryResponseCategories: it.categoryResponseCategories,
-          });
-        });
-        break;
-      case 'ORAL_TEST':
-        (inst as OralAssessmentInstrument).items?.forEach((it) => {
-          allItemLookup.set(it.id, { instrumentId: inst.id, instrumentType: 'ORAL_TEST' });
-        });
-        break;
-      case 'PERFORMANCE':
-        (inst as PerformanceAssessmentInstrument).aspects?.forEach((asp) => {
-          allItemLookup.set(asp.id, { instrumentId: inst.id, instrumentType: 'PERFORMANCE' });
-        });
-        break;
-      case 'OBSERVATION':
-        (inst as ObservationAssessmentInstrument).aspects?.forEach((asp) => {
-          allItemLookup.set(asp.id, { instrumentId: inst.id, instrumentType: 'OBSERVATION' });
-        });
-        break;
-      case 'SELF_ASSESSMENT':
-      case 'PEER_ASSESSMENT':
-        (inst as SelfPeerAssessmentInstrument).items?.forEach((it) => {
-          allItemLookup.set(it.id, { instrumentId: inst.id, instrumentType: inst.type });
-        });
-        break;
-      default:
-        break;
-    }
-  });
-
   const seenAnswerKeyTargets = new Set<string>();
 
   pkg.answerKeys.forEach((ak, akIdx) => {
@@ -956,6 +1000,87 @@ export function validateAssessmentPackage(
     }
     if (rub.instrumentItemId && !allItemLookup.has(rub.instrumentItemId)) {
       errors.push(`Rubrik "${rub.title}" merujuk pada instrumentItemId [${rub.instrumentItemId}] yang tidak ditemukan.`);
+    }
+  });
+
+  // 7. Structural Validation of AssessmentScoringGuides as Canonical Entities
+  (pkg.scoringGuides || []).forEach((guide, guideIdx) => {
+    const guideName = guide.title && guide.title.trim() !== '' ? `"${guide.title}"` : `#${guideIdx + 1}`;
+
+    // A. Title check
+    if (!guide.title || guide.title.trim() === '') {
+      errors.push(`Pedoman penskoran #${guideIdx + 1} belum memiliki judul.`);
+    }
+
+    // B. instrumentItemId without instrumentId check
+    if (guide.instrumentItemId && (!guide.instrumentId || guide.instrumentId.trim() === '')) {
+      errors.push(
+        `Pedoman penskoran ${guideName} memiliki instrumentItemId [${guide.instrumentItemId}] tanpa instrumentId.`
+      );
+    }
+
+    // C. Instrument Linkage check
+    if (guide.instrumentId && guide.instrumentId.trim() !== '') {
+      if (!instrumentMap.has(guide.instrumentId)) {
+        errors.push(
+          `Pedoman penskoran ${guideName} merujuk instrumentId [${guide.instrumentId}] yang tidak ditemukan.`
+        );
+      }
+    }
+
+    // D. Item Linkage & Ownership check
+    if (guide.instrumentItemId && guide.instrumentItemId.trim() !== '') {
+      const itemMeta = allItemLookup.get(guide.instrumentItemId);
+      if (!itemMeta) {
+        errors.push(
+          `Pedoman penskoran ${guideName} merujuk item [${guide.instrumentItemId}] yang tidak ditemukan.`
+        );
+      } else if (guide.instrumentId && itemMeta.instrumentId !== guide.instrumentId) {
+        errors.push(
+          `Pedoman penskoran ${guideName} merujuk item [${guide.instrumentItemId}] milik instrumen lain.`
+        );
+      }
+    }
+
+    // E. maxScore check
+    if (guide.maxScore !== undefined) {
+      if (
+        typeof guide.maxScore !== 'number' ||
+        !Number.isFinite(guide.maxScore) ||
+        guide.maxScore <= 0
+      ) {
+        errors.push(
+          `Pedoman penskoran ${guideName} memiliki maxScore tidak valid [${guide.maxScore}].`
+        );
+      }
+    }
+
+    // F. ESSAY guideType structural rules
+    if (guide.guideType === 'ESSAY') {
+      if (!guide.instructions || guide.instructions.trim() === '') {
+        errors.push(`Pedoman penskoran bertipe ESSAY ${guideName} wajib memiliki instruksi penskoran.`);
+      }
+      if (
+        guide.maxScore === undefined ||
+        typeof guide.maxScore !== 'number' ||
+        !Number.isFinite(guide.maxScore) ||
+        guide.maxScore <= 0
+      ) {
+        errors.push(`Pedoman penskoran bertipe ESSAY ${guideName} wajib memiliki maxScore > 0 yang valid.`);
+      }
+      if (!guide.instrumentId || guide.instrumentId.trim() === '') {
+        errors.push(`Pedoman penskoran bertipe ESSAY ${guideName} wajib terhubung dengan instrumentId.`);
+      }
+      if (!guide.instrumentItemId || guide.instrumentItemId.trim() === '') {
+        errors.push(`Pedoman penskoran bertipe ESSAY ${guideName} wajib terhubung dengan instrumentItemId.`);
+      } else {
+        const linkedItem = allItemLookup.get(guide.instrumentItemId);
+        if (linkedItem && (linkedItem.instrumentType !== 'WRITTEN_TEST' || linkedItem.itemType !== 'ESSAY')) {
+          errors.push(
+            `Pedoman penskoran bertipe ESSAY ${guideName} merujuk butir [${guide.instrumentItemId}] yang bukan berjenis ESSAY pada WRITTEN_TEST.`
+          );
+        }
+      }
     }
   });
 
