@@ -235,22 +235,28 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
           wr.items?.forEach((item) => {
             const oldItem = oldWr.items?.find((oi) => oi.id === item.id);
             if (oldItem) {
-              item.provenance = JSON.parse(JSON.stringify((oldItem as Record<string, unknown>).provenance || {}));
+              const itemRec = item as WrittenAssessmentItem & Record<string, unknown>;
+              const oldItemRec = oldItem as WrittenAssessmentItem & Record<string, unknown>;
+
+              itemRec.provenance = JSON.parse(JSON.stringify(oldItemRec.provenance || {}));
+
               if (item.prompt !== oldItem.prompt) {
-                item.provenance = item.provenance || {};
-                const provRec = item.provenance as Record<string, unknown>;
+                itemRec.provenance = itemRec.provenance || {};
+                const provRec = itemRec.provenance as Record<string, unknown>;
                 provRec.fields = provRec.fields || {};
                 (provRec.fields as Record<string, string>)['prompt'] = 'TEACHER_EDITED';
               }
+
               if (JSON.stringify(item.options) !== JSON.stringify(oldItem.options)) {
-                item.provenance = item.provenance || {};
-                const provRec = item.provenance as Record<string, unknown>;
+                itemRec.provenance = itemRec.provenance || {};
+                const provRec = itemRec.provenance as Record<string, unknown>;
                 provRec.fields = provRec.fields || {};
                 (provRec.fields as Record<string, string>)['options'] = 'TEACHER_EDITED';
               }
+
               if (item.stimulus !== oldItem.stimulus) {
-                item.provenance = item.provenance || {};
-                const provRec = item.provenance as Record<string, unknown>;
+                itemRec.provenance = itemRec.provenance || {};
+                const provRec = itemRec.provenance as Record<string, unknown>;
                 provRec.fields = provRec.fields || {};
                 (provRec.fields as Record<string, string>)['stimulus'] = 'TEACHER_EDITED';
               }

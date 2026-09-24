@@ -67,6 +67,7 @@ const mockPlan: AssessmentPlan = {
   instruments: [{ id: 'inst-written-1', type: 'WRITTEN_TEST', label: 'Tes Tertulis' }],
   workflowStatus: 'SIAP',
   needsReview: false,
+  createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
 
