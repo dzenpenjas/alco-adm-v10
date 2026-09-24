@@ -506,17 +506,22 @@ export function sanitizeAssessmentVisibleTitle(
 
   // Strip trailing bracketed/parenthesized AI draft markers e.g. (Draf AI), [Draft AI], (AI Draft), (AI-Draft)
   // Or trailing delimiter-separated markers e.g. " - Draf AI", " - AI Draft", " : Draft AI"
+  // Or bare trailing markers e.g. " Draf AI", " Draft AI", " AI Draft", " AI-Draft"
   // Note: Must require BOTH the draft/draf word AND ai (in either order), so "Asesmen Literasi AI" is NOT matched!
   const bracketedPattern = /\s*[\(\[]\s*(?:draf|draft)[\s\-_]+ai\s*[\)\]]\s*$/i;
   const bracketedPatternReverse = /\s*[\(\[]\s*ai[\s\-_]+(?:draf|draft)\s*[\)\]]\s*$/i;
   const delimitedPattern = /\s*[-—–/|:]\s*(?:draf|draft)[\s\-_]+ai\s*$/i;
   const delimitedPatternReverse = /\s*[-—–/|:]\s*ai[\s\-_]+(?:draf|draft)\s*$/i;
+  const barePattern = /\s+(?:draf|draft)[\s\-_]+ai\s*$/i;
+  const barePatternReverse = /\s+ai[\s\-_]+(?:draf|draft)\s*$/i;
 
   sanitized = sanitized
     .replace(bracketedPattern, '')
     .replace(bracketedPatternReverse, '')
     .replace(delimitedPattern, '')
     .replace(delimitedPatternReverse, '')
+    .replace(barePattern, '')
+    .replace(barePatternReverse, '')
     .trim();
 
   // If there's a trailing dangling hyphen/colon after removal, strip it
@@ -1727,7 +1732,6 @@ export function renderAssessmentPdf(model: NormalizedAssessmentDocument): Blob {
       text: isBlank
         ? '(Kolom instrumen dapat dituliskan langsung oleh guru)'
         : 'Belum ada instrumen yang dimuat dalam paket ini.',
-      color: [100, 116, 139],
     });
   }
 
@@ -1743,7 +1747,7 @@ export function renderAssessmentPdf(model: NormalizedAssessmentDocument): Blob {
       sections.push({
         type: 'paragraph',
         text: `Petunjuk: ${inst.instructions}`,
-        color: [71, 85, 105],
+        align: 'justify',
         spacingAfter: 3,
       });
     }
@@ -1810,6 +1814,7 @@ export function renderAssessmentPdf(model: NormalizedAssessmentDocument): Blob {
         sections.push({
           type: 'paragraph',
           text: `Deskripsi Proyek: ${inst.projectBrief}`,
+          align: 'justify',
           spacingAfter: 2,
         });
       }
@@ -1826,6 +1831,7 @@ export function renderAssessmentPdf(model: NormalizedAssessmentDocument): Blob {
         sections.push({
           type: 'paragraph',
           text: `Spesifikasi Produk: ${inst.productBrief}`,
+          align: 'justify',
           spacingAfter: 2,
         });
       }
@@ -1944,6 +1950,7 @@ export function renderAssessmentPdf(model: NormalizedAssessmentDocument): Blob {
         sections.push({
           type: 'paragraph',
           text: sg.instructions,
+          align: 'justify',
           spacingAfter: 2,
         });
       }
@@ -1988,7 +1995,7 @@ export function renderAssessmentPdf(model: NormalizedAssessmentDocument): Blob {
     });
   }
 
-  const builder = new PdfDocumentBuilder('portrait');
+  const builder = new PdfDocumentBuilder('portrait', 'FORMAL_NEUTRAL');
   builder.renderHeader(model.metadata.title, model.metadata.subTitle);
   builder.renderNormalizedIdentityBlock(model.metadata, extraIdentityRows);
 
