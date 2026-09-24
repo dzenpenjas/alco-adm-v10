@@ -6,7 +6,14 @@ import {
   checkAssessmentExportEligibility,
 } from '../src/services/documentEngine/assessmentExportService';
 import type { CanonicalAssessmentDocumentSnapshot } from '../src/types/assessmentExport';
-import type { AssessmentPackage } from '../src/types';
+import type {
+  AssessmentPackage,
+  SelfPeerAssessmentInstrument,
+  OralAssessmentInstrument,
+  PerformanceAssessmentInstrument,
+  AssessmentAnswerKey,
+  AssessmentScoringGuide,
+} from '../src/types';
 
 console.log('=== B.1.2j ASSESSMENT EXPORT FIDELITY REGRESSION SUITE ===');
 
@@ -18,8 +25,9 @@ function test(name: string, fn: () => void) {
     fn();
     console.log(`  [PASS] ${name}`);
     passed++;
-  } catch (err: any) {
-    console.error(`  [FAIL] ${name}:`, err.message);
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`  [FAIL] ${name}:`, errorMsg);
     failed++;
   }
 }
@@ -46,6 +54,7 @@ function createBaseSnapshotFixture(
     phase: 'C',
     academicYear: '2026/2027',
     semester: '1',
+    principalName: 'Kepala Sekolah',
     teacherName: 'Guru Penjas',
     teacherNip: '198505052010011015',
     blueprintItems: [],
@@ -55,6 +64,26 @@ function createBaseSnapshotFixture(
     rubrics: [],
     resolvedObjectives: {},
     generatedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+function createBasePackageFixture(
+  overrides?: Partial<AssessmentPackage>
+): AssessmentPackage {
+  return {
+    id: 'pkg-default',
+    assessmentPlanId: 'plan-default',
+    academicSettingId: 'setting-default',
+    title: 'Paket Asesmen',
+    blueprintItems: [],
+    instruments: [],
+    answerKeys: [],
+    scoringGuides: [],
+    rubrics: [],
+    workflowStatus: 'SIAP',
+    needsReview: false,
+    revision: 1,
     ...overrides,
   };
 }
@@ -83,19 +112,18 @@ function runTests() {
   // TEST 2 — SELF responseScheme NORMALIZATION
   // ----------------------------------------------------
   test('TEST 2: SELF_ASSESSMENT normalization preserves responseScheme', () => {
-    const snapshot = createBaseSnapshotFixture({
-      instruments: [
-        {
-          id: 'self-1',
-          type: 'SELF_ASSESSMENT',
-          title: 'Refleksi Diri Sikap',
-          instructions: 'Isilah dengan jujur',
-          responseScheme: 'Skala Likert 1-4',
-          items: [
-            { id: 'sp-1', statement: 'Saya berdoa sebelum olahraga', category: 'Spiritual' },
-          ],
-        } as any,
+    const selfInst: SelfPeerAssessmentInstrument = {
+      id: 'self-1',
+      type: 'SELF_ASSESSMENT',
+      title: 'Refleksi Diri Sikap',
+      instructions: 'Isilah dengan jujur',
+      responseScheme: 'Skala Likert 1-4',
+      items: [
+        { id: 'sp-1', statement: 'Saya berdoa sebelum olahraga', category: 'Spiritual' },
       ],
+    };
+    const snapshot = createBaseSnapshotFixture({
+      instruments: [selfInst],
     });
 
     const normalized = buildNormalizedAssessmentDocumentModel(snapshot);
@@ -108,19 +136,18 @@ function runTests() {
   // TEST 3 — PEER responseScheme NORMALIZATION
   // ----------------------------------------------------
   test('TEST 3: PEER_ASSESSMENT normalization preserves responseScheme', () => {
-    const snapshot = createBaseSnapshotFixture({
-      instruments: [
-        {
-          id: 'peer-1',
-          type: 'PEER_ASSESSMENT',
-          title: 'Penilaian Teman Sejawat',
-          instructions: 'Amati temanmu',
-          responseScheme: 'Ya / Tidak',
-          items: [
-            { id: 'sp-2', statement: 'Teman saya sportif', category: 'Sosial' },
-          ],
-        } as any,
+    const peerInst: SelfPeerAssessmentInstrument = {
+      id: 'peer-1',
+      type: 'PEER_ASSESSMENT',
+      title: 'Penilaian Teman Sejawat',
+      instructions: 'Amati temanmu',
+      responseScheme: 'Ya / Tidak',
+      items: [
+        { id: 'sp-2', statement: 'Teman saya sportif', category: 'Sosial' },
       ],
+    };
+    const snapshot = createBaseSnapshotFixture({
+      instruments: [peerInst],
     });
 
     const normalized = buildNormalizedAssessmentDocumentModel(snapshot);
@@ -161,7 +188,6 @@ function runTests() {
   // TEST 6 — responseScheme PDF
   // ----------------------------------------------------
   test('TEST 6: PDF export branch consumes inst.responseScheme', () => {
-    // Assert both DOCX and PDF sections consume responseScheme
     const matches = exportServiceContent.match(/Skema Respon:/g);
     assert.ok(matches && matches.length >= 2, 'Both DOCX and PDF must render Skema Respon:');
   });
@@ -170,21 +196,21 @@ function runTests() {
   // TEST 7 — ORAL expectedResponse NORMALIZED
   // ----------------------------------------------------
   test('TEST 7: Normalization preserves oral expectedResponse', () => {
-    const snapshot = createBaseSnapshotFixture({
-      instruments: [
+    const oralInst: OralAssessmentInstrument = {
+      id: 'oral-1',
+      type: 'ORAL_TEST',
+      title: 'Tes Lisan Peraturan',
+      items: [
         {
-          id: 'oral-1',
-          type: 'ORAL_TEST',
-          title: 'Tes Lisan Peraturan',
-          items: [
-            {
-              id: 'oi-1',
-              prompt: 'Sebutkan 3 macam start!',
-              expectedResponse: 'Start jongkok, melayang, dan berdiri',
-            },
-          ],
-        } as any,
+          id: 'oi-1',
+          prompt: 'Sebutkan 3 macam start!',
+          expectedResponse: 'Start jongkok, melayang, dan berdiri',
+          order: 1,
+        },
       ],
+    };
+    const snapshot = createBaseSnapshotFixture({
+      instruments: [oralInst],
     });
 
     const normalized = buildNormalizedAssessmentDocumentModel(snapshot);
@@ -236,17 +262,16 @@ function runTests() {
   // TEST 11 — SCORING GUIDE notes NORMALIZED
   // ----------------------------------------------------
   test('TEST 11: Normalization preserves scoring guide notes', () => {
+    const scoringGuide: AssessmentScoringGuide = {
+      id: 'sg-1',
+      title: 'Pedoman Penilaian Praktik',
+      guideType: 'RUBRIC_BASED',
+      maxScore: 100,
+      instructions: 'Nilai seluruh aspek secara menyeluruh',
+      notes: 'Dibulatkan ke bilangan bulat terdekat',
+    };
     const snapshot = createBaseSnapshotFixture({
-      scoringGuides: [
-        {
-          id: 'sg-1',
-          title: 'Pedoman Penilaian Praktik',
-          guideType: 'HOLISTIC',
-          maxScore: 100,
-          instructions: 'Nilai seluruh aspek secara menyeluruh',
-          notes: 'Dibulatkan ke bilangan bulat terdekat',
-        } as any,
-      ],
+      scoringGuides: [scoringGuide],
     });
 
     const normalized = buildNormalizedAssessmentDocumentModel(snapshot);
@@ -305,24 +330,22 @@ function runTests() {
   // TEST 16 — ANSWER KEY EXACT INSTRUMENT RESOLUTION
   // ----------------------------------------------------
   test('TEST 16: Answer key resolves exact instrumentType from linked instrument (ORAL_TEST)', () => {
+    const oralInst: OralAssessmentInstrument = {
+      id: 'oral-inst-1',
+      type: 'ORAL_TEST',
+      title: 'Tes Lisan',
+      items: [{ id: 'oi-1', prompt: 'Pertanyaan', expectedResponse: 'Kunci', order: 1 }],
+    };
+    const answerKey: AssessmentAnswerKey = {
+      id: 'ak-1',
+      instrumentId: 'oral-inst-1',
+      instrumentItemId: 'oi-1',
+      answerType: 'EXPECTED_RESPONSE',
+      value: 'Kunci jawaban lisan',
+    };
     const snapshot = createBaseSnapshotFixture({
-      instruments: [
-        {
-          id: 'oral-inst-1',
-          type: 'ORAL_TEST',
-          title: 'Tes Lisan',
-          items: [{ id: 'oi-1', prompt: 'Pertanyaan', expectedResponse: 'Kunci' }],
-        } as any,
-      ],
-      answerKeys: [
-        {
-          id: 'ak-1',
-          instrumentId: 'oral-inst-1',
-          instrumentItemId: 'oi-1',
-          answerType: 'OPEN_RESPONSE',
-          value: 'Kunci jawaban lisan',
-        } as any,
-      ],
+      instruments: [oralInst],
+      answerKeys: [answerKey],
     });
 
     const normalized = buildNormalizedAssessmentDocumentModel(snapshot);
@@ -333,37 +356,35 @@ function runTests() {
   // TEST 17 — NON-WRITTEN SEMANTIC CASE
   // ----------------------------------------------------
   test('TEST 17: Answer key resolves exact instrumentType for SELF_ASSESSMENT and PEER_ASSESSMENT', () => {
+    const selfInst: SelfPeerAssessmentInstrument = {
+      id: 'self-inst-1',
+      type: 'SELF_ASSESSMENT',
+      title: 'Penilaian Diri',
+      items: [{ id: 'si-1', statement: 'Pernyataan' }],
+    };
+    const peerInst: SelfPeerAssessmentInstrument = {
+      id: 'peer-inst-1',
+      type: 'PEER_ASSESSMENT',
+      title: 'Penilaian Teman',
+      items: [{ id: 'pi-1', statement: 'Pernyataan' }],
+    };
+    const akSelf: AssessmentAnswerKey = {
+      id: 'ak-self',
+      instrumentId: 'self-inst-1',
+      instrumentItemId: 'si-1',
+      answerType: 'CATEGORY_RESPONSE',
+      value: 'Kunci Self',
+    };
+    const akPeer: AssessmentAnswerKey = {
+      id: 'ak-peer',
+      instrumentId: 'peer-inst-1',
+      instrumentItemId: 'pi-1',
+      answerType: 'CATEGORY_RESPONSE',
+      value: 'Kunci Peer',
+    };
     const snapshot = createBaseSnapshotFixture({
-      instruments: [
-        {
-          id: 'self-inst-1',
-          type: 'SELF_ASSESSMENT',
-          title: 'Penilaian Diri',
-          items: [{ id: 'si-1', statement: 'Pernyataan' }],
-        } as any,
-        {
-          id: 'peer-inst-1',
-          type: 'PEER_ASSESSMENT',
-          title: 'Penilaian Teman',
-          items: [{ id: 'pi-1', statement: 'Pernyataan' }],
-        } as any,
-      ],
-      answerKeys: [
-        {
-          id: 'ak-self',
-          instrumentId: 'self-inst-1',
-          instrumentItemId: 'si-1',
-          answerType: 'CATEGORY_RESPONSE',
-          value: 'Kunci Self',
-        } as any,
-        {
-          id: 'ak-peer',
-          instrumentId: 'peer-inst-1',
-          instrumentItemId: 'pi-1',
-          answerType: 'CATEGORY_RESPONSE',
-          value: 'Kunci Peer',
-        } as any,
-      ],
+      instruments: [selfInst, peerInst],
+      answerKeys: [akSelf, akPeer],
     });
 
     const normalized = buildNormalizedAssessmentDocumentModel(snapshot);
@@ -375,23 +396,22 @@ function runTests() {
   // TEST 18 — DANGLING instrumentId DOES NOT FAKE WRITTEN
   // ----------------------------------------------------
   test('TEST 18: Dangling instrumentId resolves to explicit unknown "-" without faking WRITTEN_TEST', () => {
+    const perfInst: PerformanceAssessmentInstrument = {
+      id: 'perf-inst-1',
+      type: 'PERFORMANCE',
+      title: 'Praktik',
+      task: 'Lakukan tugas praktik.',
+    };
+    const danglingAk: AssessmentAnswerKey = {
+      id: 'ak-dangling',
+      instrumentId: 'non-existent-id',
+      instrumentItemId: 'item-none',
+      answerType: 'OPTION',
+      value: 'A',
+    };
     const snapshot = createBaseSnapshotFixture({
-      instruments: [
-        {
-          id: 'perf-inst-1',
-          type: 'PERFORMANCE',
-          title: 'Praktik',
-        } as any,
-      ],
-      answerKeys: [
-        {
-          id: 'ak-dangling',
-          instrumentId: 'non-existent-id',
-          instrumentItemId: 'item-none',
-          answerType: 'OPTION',
-          value: 'A',
-        } as any,
-      ],
+      instruments: [perfInst],
+      answerKeys: [danglingAk],
     });
 
     const normalized = buildNormalizedAssessmentDocumentModel(snapshot);
@@ -499,20 +519,20 @@ function runTests() {
   // TEST 25 — EXPORT ELIGIBILITY UNCHANGED
   // ----------------------------------------------------
   test('TEST 25: checkAssessmentExportEligibility strictly blocks non-SIAP and needsReview packages', () => {
-    const draftPkg: AssessmentPackage = {
+    const draftPkg: AssessmentPackage = createBasePackageFixture({
       id: 'pkg-draft',
       workflowStatus: 'DRAFT',
       needsReview: false,
-    } as any;
+    });
 
     const resDraft = checkAssessmentExportEligibility(draftPkg);
     assert.strictEqual(resDraft.eligible, false);
 
-    const reviewPkg: AssessmentPackage = {
+    const reviewPkg: AssessmentPackage = createBasePackageFixture({
       id: 'pkg-review',
       workflowStatus: 'SIAP',
       needsReview: true,
-    } as any;
+    });
 
     const resReview = checkAssessmentExportEligibility(reviewPkg);
     assert.strictEqual(resReview.eligible, false);
