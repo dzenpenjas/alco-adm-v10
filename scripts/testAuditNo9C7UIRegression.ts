@@ -1062,7 +1062,11 @@ async function runTests() {
       validationReport: mockPassReport,
       confirmationEligible: true,
     };
-    const result = confirmAssessmentPackage(validPkgForPlan, validationContext as any);
+    const result = confirmAssessmentPackage(
+      validPkgForPlan,
+      validationContext as any,
+      { ...mockPassReport, assessmentPackageId: 'pkg-plan-1' }
+    );
     assert(result.success === true, `confirmAssessmentPackage should succeed: ${result.errors.join(', ')}`);
     assert(result.package.workflowStatus === 'SIAP', 'Confirmed package must have workflowStatus SIAP');
     assert(result.package.needsReview === false, 'Confirmed package must have needsReview false');
@@ -1181,7 +1185,11 @@ async function runTests() {
       validationReport: mockPassReport,
       confirmationEligible: true,
     };
-    const result = confirmAssessmentPackage(validPkgForPlan, validationContext as any);
+    const result = confirmAssessmentPackage(
+      validPkgForPlan,
+      validationContext as any,
+      { ...mockPassReport, assessmentPackageId: 'pkg-valid' }
+    );
     assert(result.success === true, `confirmAssessmentPackage should succeed: ${result.errors.join(', ')}`);
     assert(result.package.workflowStatus === 'SIAP', 'confirmAssessmentPackage must yield workflowStatus = SIAP');
   });

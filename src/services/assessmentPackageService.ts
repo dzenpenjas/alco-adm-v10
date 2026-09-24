@@ -31,6 +31,7 @@ import {
   PortfolioAssessmentInstrument,
   SelfPeerAssessmentInstrument,
 } from '../types';
+import type { AssessmentValidationReport } from '../types/assessmentValidation';
 import { isK13, isMerdeka } from './curriculumRouter';
 
 export interface AssessmentPackageValidationContext {
@@ -857,19 +858,55 @@ export function validateAssessmentPackage(
 
 export function canConfirmAssessmentPackage(
   pkg: AssessmentPackage,
-  context: AssessmentPackageValidationContext
+  context: AssessmentPackageValidationContext,
+  validationReport: AssessmentValidationReport | null | undefined
 ): { eligible: boolean; errors: string[]; warnings: string[] } {
   const validation = validateAssessmentPackage(pkg, context);
+  const errors = [...validation.errors];
+  const warnings = [...validation.warnings];
+
+  if (!validationReport) {
+    errors.push('Laporan validasi final belum tersedia.');
+    return {
+      eligible: false,
+      errors,
+      warnings,
+    };
+  }
+
+  if (validationReport.assessmentPackageId !== pkg.id) {
+    errors.push('Laporan validasi tidak cocok dengan ID Perangkat Asesmen.');
+  }
+
+  const pkgRevision = pkg.revision ?? 1;
+  if (validationReport.packageRevision !== pkgRevision) {
+    errors.push(
+      `Laporan validasi tidak cocok dengan revisi Perangkat Asesmen (revisi paket: ${pkgRevision}, revisi laporan: ${validationReport.packageRevision}).`
+    );
+  }
+
+  if (
+    validationReport.overallStatus !== 'PASS' &&
+    validationReport.overallStatus !== 'REVIEW'
+  ) {
+    errors.push(
+      `Status validasi "${validationReport.overallStatus}" tidak memenuhi syarat untuk konfirmasi (wajib PASS atau REVIEW).`
+    );
+  }
+
+  const eligible = validation.valid && errors.length === 0;
+
   return {
-    eligible: validation.valid,
-    errors: validation.errors,
-    warnings: validation.warnings,
+    eligible,
+    errors,
+    warnings,
   };
 }
 
 export function confirmAssessmentPackage(
   pkg: AssessmentPackage,
-  context: AssessmentPackageValidationContext
+  context: AssessmentPackageValidationContext,
+  validationReport: AssessmentValidationReport | null | undefined
 ): { success: boolean; package: AssessmentPackage; errors: string[] } {
   const validation = validateAssessmentPackage(pkg, context);
   if (!validation.valid) {
@@ -882,6 +919,15 @@ export function confirmAssessmentPackage(
         reviewReason: validation.errors.join('; '),
       },
       errors: validation.errors,
+    };
+  }
+
+  const gate = canConfirmAssessmentPackage(pkg, context, validationReport);
+  if (!gate.eligible) {
+    return {
+      success: false,
+      package: pkg,
+      errors: gate.errors,
     };
   }
 

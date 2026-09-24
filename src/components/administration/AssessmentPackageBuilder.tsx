@@ -136,7 +136,7 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
   };
 
   const confirmationEligible = activePackage
-    ? canConfirmAssessmentPackage(activePackage, validationContext).eligible
+    ? canConfirmAssessmentPackage(activePackage, validationContext, validationReport).eligible
     : false;
 
   // Deterministic state machine resolver
@@ -793,7 +793,7 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
                 <button
                   onClick={() => {
                     if (!activePackage) return;
-                    const res = confirmAssessmentPackage(activePackage, validationContext);
+                    const res = confirmAssessmentPackage(activePackage, validationContext, validationReport);
                     onSaveAssessmentPackage(res.package);
                   }}
                   className={`px-4 py-2 ${

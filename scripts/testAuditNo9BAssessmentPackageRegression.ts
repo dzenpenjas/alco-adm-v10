@@ -16,6 +16,7 @@ import {
   AssessmentBlueprintItem,
   AssessmentCriterion,
 } from '../src/types';
+import type { AssessmentValidationReport } from '../src/types/assessmentValidation';
 
 async function runRegressionTests() {
   console.log('=== STARTING AUDIT 9B REGRESSION TEST SUITE (TESTS A-O) ===\n');
@@ -379,17 +380,35 @@ async function runRegressionTests() {
 
   // TEST N: Valid complete package -> SIAP
   console.log('Test N: Valid complete package -> SIAP confirmation');
-  const confirmN = confirmAssessmentPackage(validLinkedPkg, {
-    academicSetting: mockMerdekaSetting,
-    assessmentPlan: {
-      ...mockAssessmentPlan,
-      instruments: [
-        { id: 'i1', type: 'WRITTEN_TEST', label: 'Tes' },
-        { id: 'i2', type: 'OBSERVATION', label: 'Obs' },
-      ],
+  const mockReportN: AssessmentValidationReport = {
+    id: 'report-confirm-n',
+    assessmentPackageId: validLinkedPkg.id,
+    packageRevision: validLinkedPkg.revision ?? 1,
+    structural: { status: 'PASS', findings: [] },
+    coverage: { status: 'PASS', findings: [] },
+    answerVerification: { status: 'PASS', findings: [] },
+    quality: { status: 'PASS', findings: [] },
+    assembly: { status: 'PASS', findings: [] },
+    overallStatus: 'PASS',
+    reviewerStatus: 'NOT_REQUESTED',
+    engineVersion: '1.0.0',
+    createdAt: '2026-09-24T00:00:00.000Z',
+  };
+  const confirmN = confirmAssessmentPackage(
+    validLinkedPkg,
+    {
+      academicSetting: mockMerdekaSetting,
+      assessmentPlan: {
+        ...mockAssessmentPlan,
+        instruments: [
+          { id: 'i1', type: 'WRITTEN_TEST', label: 'Tes' },
+          { id: 'i2', type: 'OBSERVATION', label: 'Obs' },
+        ],
+      },
+      tp: mockTP,
     },
-    tp: mockTP,
-  });
+    mockReportN
+  );
   if (!confirmN.success || confirmN.package.workflowStatus !== 'SIAP') {
     throw new Error(`FAILED: Valid package could not be confirmed: ${confirmN.errors.join('; ')}`);
   }
