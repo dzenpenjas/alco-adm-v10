@@ -3,8 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { buildNormalizedAssessmentDocumentModel } from '../src/services/documentEngine/assessmentExportService';
 import type {
-  AssessmentDocumentSnapshot,
-  AssessmentPackage,
+  CanonicalAssessmentDocumentSnapshot,
   WrittenAssessmentInstrument,
   OralAssessmentInstrument,
   PerformanceAssessmentInstrument,
@@ -29,14 +28,22 @@ function test(name: string, fn: () => void) {
 }
 
 function createBaseSnapshotFixture(
-  overrides?: Partial<AssessmentDocumentSnapshot>
-): AssessmentDocumentSnapshot {
+  overrides?: Partial<CanonicalAssessmentDocumentSnapshot>
+): CanonicalAssessmentDocumentSnapshot {
   return {
-    academicSettingId: 'setting-1',
+    snapshotId: 'snapshot-test-1',
+    mode: 'CANONICAL_PACKAGE',
+    documentType: 'ASESMEN',
+    documentDate: '2026-09-24',
+    formattedDocumentDate: 'Surakarta, 24 September 2026',
     assessmentPlanId: 'plan-1',
+    assessmentPlanTitle: 'Rencana Asesmen PJOK',
+    assessmentPackageId: 'pkg-1',
+    assessmentPackageRevision: 1,
+    packageTitle: 'Paket Asesmen PJOK Semester 1',
     schoolName: 'SD Negeri Percobaan',
     schoolAddress: 'Jl. Pendidikan No. 1',
-    schoolCity: 'Surakarta',
+    schoolRegency: 'Surakarta',
     schoolProvince: 'Jawa Tengah',
     principalName: 'Budi Santoso, M.Pd.',
     principalNip: '197001011995011001',
@@ -102,14 +109,12 @@ function runTests() {
       items: [
         {
           id: 'item-1',
-          no: 1,
           order: 1,
           itemType: 'MULTIPLE_CHOICE',
           prompt: 'Soal 1',
         },
         {
           id: 'item-2',
-          no: 2,
           order: 7,
           itemType: 'ESSAY',
           prompt: 'Soal 2',
@@ -124,7 +129,7 @@ function runTests() {
           id: 'ak-2',
           instrumentId: 'inst-w1',
           instrumentItemId: 'item-2',
-          answerType: 'ESSAY',
+          answerType: 'EXPECTED_RESPONSE',
           value: 'Kunci Soal 2',
         },
       ],
@@ -201,7 +206,7 @@ function runTests() {
     const snapshot = createBaseSnapshotFixture({
       instruments: [writtenInstrument],
       answerKeys: [
-        { id: 'ak-11', instrumentId: 'inst-w1', instrumentItemId: 'it-11', answerType: 'SHORT_ANSWER', value: 'Ans 11' },
+        { id: 'ak-11', instrumentId: 'inst-w1', instrumentItemId: 'it-11', answerType: 'EXACT', value: 'Ans 11' },
       ],
     });
 
@@ -248,7 +253,7 @@ function runTests() {
     const snapshot = createBaseSnapshotFixture({
       instruments: [writtenInstrument],
       answerKeys: [
-        { id: 'ak-ghost', instrumentId: 'inst-w1', instrumentItemId: 'item-non-existent', answerType: 'ESSAY', value: 'Ghost' },
+        { id: 'ak-ghost', instrumentId: 'inst-w1', instrumentItemId: 'item-non-existent', answerType: 'EXPECTED_RESPONSE', value: 'Ghost' },
       ],
     });
 
@@ -264,7 +269,7 @@ function runTests() {
     const snapshot = createBaseSnapshotFixture({
       instruments: [],
       answerKeys: [
-        { id: 'ak-ghost-inst', instrumentId: 'ghost-inst', instrumentItemId: 'ghost-item', answerType: 'ESSAY', value: 'Ghost' },
+        { id: 'ak-ghost-inst', instrumentId: 'ghost-inst', instrumentItemId: 'ghost-item', answerType: 'EXPECTED_RESPONSE', value: 'Ghost' },
       ],
     });
 
@@ -292,7 +297,7 @@ function runTests() {
       instruments: [instA, instB],
       answerKeys: [
         // AnswerKey points to inst-a, but item-y belongs to inst-b
-        { id: 'ak-cross', instrumentId: 'inst-a', instrumentItemId: 'item-y', answerType: 'ESSAY', value: 'Val' },
+        { id: 'ak-cross', instrumentId: 'inst-a', instrumentItemId: 'item-y', answerType: 'EXPECTED_RESPONSE', value: 'Val' },
       ],
     });
 
@@ -314,7 +319,7 @@ function runTests() {
     const snapshot = createBaseSnapshotFixture({
       instruments: [perfInst],
       answerKeys: [
-        { id: 'ak-perf', instrumentId: 'inst-p1', instrumentItemId: 'asp-1', answerType: 'RUBRIC_BASED', value: 'Rubrik' },
+        { id: 'ak-perf', instrumentId: 'inst-p1', instrumentItemId: 'asp-1', answerType: 'EXPECTED_RESPONSE', value: 'Rubrik' },
       ],
     });
 
@@ -424,7 +429,7 @@ function runTests() {
       instruments: [oralInst, writtenInst],
       answerKeys: [
         { id: 'ak-1', instrumentId: 'o-1', instrumentItemId: 'oi-1', answerType: 'EXPECTED_RESPONSE', value: 'Ans' },
-        { id: 'ak-2', instrumentId: 'w-1', instrumentItemId: 'wi-1', answerType: 'ESSAY', value: 'Ans' },
+        { id: 'ak-2', instrumentId: 'w-1', instrumentItemId: 'wi-1', answerType: 'EXPECTED_RESPONSE', value: 'Ans' },
       ],
     });
 
