@@ -985,19 +985,76 @@ console.log('=== B.1.2p Canonical ID, Reference & Scope Integrity Regression Tes
   );
 }
 
-// Test 46: Preservation B.1.2n - MULTIPLE_CHOICE without AssessmentAnswerKey canonical fails validation
+// Test 46: Preservation B.1.2n - Canonical optionIds resolve to exact option.label
 {
   const pkg = createValidPackage();
   const writtenInst = pkg.instruments[0] as WrittenAssessmentInstrument;
-  // Set legacy isCorrect on option, but remove canonical AssessmentAnswerKey for this item
-  writtenInst.items![0].options![0].isCorrect = true;
-  pkg.answerKeys = pkg.answerKeys.filter((ak) => ak.instrumentItemId !== 'item-mc-1');
+  const mcItem = writtenInst.items![0];
 
-  const res = validateAssessmentPackage(pkg, mockContext);
-  assert(!res.valid, 'Test 46: Preservation B.1.2n - MULTIPLE_CHOICE without canonical AssessmentAnswerKey fails validation');
+  mcItem.options = [
+    {
+      id: 'opt-a',
+      label: 'A',
+      text: 'James Naismith',
+      isCorrect: false,
+    },
+    {
+      id: 'opt-b',
+      label: 'B',
+      text: 'William G. Morgan',
+      isCorrect: true,
+    },
+  ];
+
+  const mcAnswerKey = pkg.answerKeys.find((ak) => ak.instrumentItemId === mcItem.id);
+  assert(mcAnswerKey !== undefined, 'Test 46: Canonical MC answer key exists');
+  if (mcAnswerKey) {
+    mcAnswerKey.optionIds = ['opt-a'];
+  }
+
+  const snapshot: AssessmentDocumentSnapshot = {
+    snapshotId: 'snap-test-b12n',
+    mode: 'CANONICAL_PACKAGE',
+    documentType: 'ASESMEN',
+    documentDate: '2026-09-24',
+    formattedDocumentDate: 'Surakarta, 24 September 2026',
+    assessmentPlanId: pkg.assessmentPlanId,
+    assessmentPackageId: pkg.id,
+    assessmentPackageRevision: 1,
+    packageTitle: pkg.title,
+    schoolName: 'SD Negeri Percobaan',
+    teacherName: 'Guru Penjas',
+    academicYear: '2025/2026',
+    semester: '1 (Ganjil)',
+    grade: 'Kelas 10',
+    subject: 'PJOK',
+    curriculum: 'Kurikulum Merdeka',
+    documentMode: 'data',
+    generatedAt: new Date().toISOString(),
+    blueprintItems: pkg.blueprintItems,
+    instruments: pkg.instruments,
+    answerKeys: pkg.answerKeys,
+    scoringGuides: pkg.scoringGuides,
+    rubrics: pkg.rubrics,
+    resolvedObjectives: {},
+  };
+
+  const model = buildNormalizedAssessmentDocumentModel(snapshot);
+  const normalizedMc = model.answerKeys.list.find(
+    (ak) => ak.answerType === 'OPTION' && ak.instrumentType === 'WRITTEN_TEST'
+  );
+  assert(normalizedMc !== undefined, 'Test 46: Normalized MC answer key found');
   assert(
-    res.errors.some((e) => e.includes('belum memiliki AssessmentAnswerKey canonical')),
-    'Test 46: Contains canonical answer key requirement error message'
+    normalizedMc?.value === 'A',
+    'Test 46: B.1.2n canonical optionIds resolve to exact option.label'
+  );
+  assert(
+    normalizedMc?.value !== 'B',
+    'Test 46: Legacy isCorrect does not override canonical AssessmentAnswerKey'
+  );
+  assert(
+    normalizedMc?.value !== 'William G. Morgan',
+    'Test 46: Answer value is label A, not option text'
   );
 }
 
