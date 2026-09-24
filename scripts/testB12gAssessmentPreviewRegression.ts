@@ -43,13 +43,13 @@ function runTests() {
     regency: 'Kota Administrasi Jakarta Pusat',
     province: 'DKI Jakarta',
     principalName: 'Budi Santoso, M.Pd.',
-  };
+  } as unknown as SchoolData;
 
   const mockProfile: TeacherProfile = {
     name: 'Siti Rahma, S.Pd.',
     nip: '198501012010012001',
     status: 'PNS',
-  };
+  } as unknown as TeacherProfile;
 
   const mockAcademicSetting: AcademicSetting = {
     id: 'setting-1',
@@ -59,7 +59,7 @@ function runTests() {
     phase: 'E',
     subject: 'Biologi',
     curriculum: 'Kurikulum Merdeka',
-  };
+  } as unknown as AcademicSetting;
 
   const mockPlan: AssessmentPlan = {
     id: 'plan-1',
@@ -77,7 +77,7 @@ function runTests() {
     needsReview: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  };
+  } as unknown as AssessmentPlan;
 
   const draftPackage: AssessmentPackage = {
     id: 'pkg-draft-1',

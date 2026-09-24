@@ -37,9 +37,6 @@ import {
 } from '../../types';
 import { DocumentGenerationContext } from './types';
 import {
-  createDocumentHeader,
-  createTableHeaderCell,
-  createTableDataCell,
   INDONESIAN_MONTHS,
 } from './docxStyles';
 import {
@@ -498,6 +495,37 @@ export function createAssessmentPreviewModel(
 }
 
 /**
+ * Sanitizes visible titles by stripping trailing provenance markers (e.g. "(Draf AI)", "- AI Draft").
+ * Preserves legitimate pedagogical content containing "AI" (e.g. "Literasi AI").
+ */
+export function sanitizeAssessmentVisibleTitle(
+  value?: string
+): string | undefined {
+  if (!value) return value;
+  let sanitized = value.trim();
+
+  // Strip trailing bracketed/parenthesized AI draft markers e.g. (Draf AI), [Draft AI], (AI Draft), (AI-Draft)
+  // Or trailing delimiter-separated markers e.g. " - Draf AI", " - AI Draft", " : Draft AI"
+  // Note: Must require BOTH the draft/draf word AND ai (in either order), so "Asesmen Literasi AI" is NOT matched!
+  const bracketedPattern = /\s*[\(\[]\s*(?:draf|draft)[\s\-_]+ai\s*[\)\]]\s*$/i;
+  const bracketedPatternReverse = /\s*[\(\[]\s*ai[\s\-_]+(?:draf|draft)\s*[\)\]]\s*$/i;
+  const delimitedPattern = /\s*[-—–/|:]\s*(?:draf|draft)[\s\-_]+ai\s*$/i;
+  const delimitedPatternReverse = /\s*[-—–/|:]\s*ai[\s\-_]+(?:draf|draft)\s*$/i;
+
+  sanitized = sanitized
+    .replace(bracketedPattern, '')
+    .replace(bracketedPatternReverse, '')
+    .replace(delimitedPattern, '')
+    .replace(delimitedPatternReverse, '')
+    .trim();
+
+  // If there's a trailing dangling hyphen/colon after removal, strip it
+  sanitized = sanitized.replace(/\s*[-—–/|:]\s*$/, '').trim();
+
+  return sanitized || value;
+}
+
+/**
  * Builds a normalized, semantic document model from an AssessmentDocumentSnapshot.
  * Both DOCX and PDF renderers consume this exact normalized model, ensuring complete parity.
  */
@@ -507,9 +535,10 @@ export function buildNormalizedAssessmentDocumentModel(
   const isBlank = snapshot.documentMode === 'blank' || snapshot.mode === 'BLANK_TEMPLATE';
 
   // 1. Metadata
+  const rawSubTitle = snapshot.packageTitle || (isBlank ? 'Format Instrumen dan Rubrik Asesmen' : 'Paket Instrumen dan Rubrik Asesmen');
   const metadata = {
     title: 'PERANGKAT ASESMEN PEMBELAJARAN',
-    subTitle: snapshot.packageTitle || (isBlank ? 'Format Instrumen dan Rubrik Asesmen' : 'Paket Instrumen dan Rubrik Asesmen'),
+    subTitle: sanitizeAssessmentVisibleTitle(rawSubTitle) || rawSubTitle,
     schoolName: snapshot.schoolName,
     npsn: snapshot.npsn,
     schoolAddress: snapshot.schoolAddress,
@@ -570,7 +599,7 @@ export function buildNormalizedAssessmentDocumentModel(
           id: inst.id,
           type: inst.type,
           typeLabel: getInstrumentTypeLabel(inst.type),
-          title: inst.title,
+          title: sanitizeAssessmentVisibleTitle(inst.title) || inst.title,
           instructions: (inst as any).instructions,
         };
 
@@ -678,7 +707,7 @@ export function buildNormalizedAssessmentDocumentModel(
   const scoringGuides: NormalizedAssessmentScoringGuide[] = isBlank
     ? []
     : snapshot.scoringGuides.map((sg) => ({
-        title: sg.title,
+        title: sanitizeAssessmentVisibleTitle(sg.title) || sg.title,
         guideType: sg.guideType,
         maxScore: sg.maxScore,
         instructions: sg.instructions,
@@ -711,7 +740,7 @@ export function buildNormalizedAssessmentDocumentModel(
         });
 
         return {
-          title: r.title,
+          title: sanitizeAssessmentVisibleTitle(r.title) || r.title,
           scale: scaleHeaders,
           criteria: criteriaRows,
         };
@@ -782,6 +811,152 @@ function getInstrumentTypeLabel(type: string): string {
   }
 }
 
+// Local Assessment DOCX Typography & Layout Standards
+const ASSESSMENT_DOCX_FONT = 'Times New Roman';
+const ASSESSMENT_DOCX_BLACK = '000000';
+
+// Font sizes in docx half-points (pt * 2)
+const FONT_SIZE_DOCX_TITLE = 28; // 14 pt bold title
+const FONT_SIZE_DOCX_HEADING = 24; // 12 pt bold heading/subtitle
+const FONT_SIZE_DOCX_BODY = 24; // 12 pt body text
+const FONT_SIZE_DOCX_TABLE = 20; // 10 pt table text
+const FONT_SIZE_DOCX_SIGNOFF = 20; // 10 pt sign-off text
+
+// Spacing & indentation in twips (1 pt = 20 twips, 1 cm ≈ 567 twips)
+const LINE_SPACING_1_15 = 276; // 1.15 line spacing (240 * 1.15 = 276 twips)
+const SPACING_AFTER_6PT = 120; // 6 pt after paragraph (6 * 20 = 120 twips)
+const INDENT_FIRST_LINE_1_25CM = 709; // 1.25 cm ≈ 708.66 twips
+
+function createAssessmentDocumentHeader(
+  title: string,
+  subTitle?: string
+): Paragraph[] {
+  const paragraphs: Paragraph[] = [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 100 },
+      children: [
+        new TextRun({
+          text: title.toUpperCase(),
+          bold: true,
+          size: FONT_SIZE_DOCX_TITLE,
+          font: ASSESSMENT_DOCX_FONT,
+          color: ASSESSMENT_DOCX_BLACK,
+        }),
+      ],
+    }),
+  ];
+
+  if (subTitle) {
+    paragraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 200 },
+        children: [
+          new TextRun({
+            text: subTitle.toUpperCase(),
+            bold: true,
+            size: FONT_SIZE_DOCX_HEADING,
+            font: ASSESSMENT_DOCX_FONT,
+            color: ASSESSMENT_DOCX_BLACK,
+          }),
+        ],
+      })
+    );
+  }
+
+  return paragraphs;
+}
+
+function createAssessmentSectionHeading(title: string): Paragraph {
+  return new Paragraph({
+    alignment: AlignmentType.LEFT,
+    spacing: { before: 200, after: 120 },
+    children: [
+      new TextRun({
+        text: title,
+        bold: true,
+        size: FONT_SIZE_DOCX_HEADING,
+        font: ASSESSMENT_DOCX_FONT,
+        color: ASSESSMENT_DOCX_BLACK,
+      }),
+    ],
+  });
+}
+
+function createAssessmentNarrativeParagraph(
+  text: string,
+  options?: { bold?: boolean; italics?: boolean }
+): Paragraph {
+  return new Paragraph({
+    alignment: AlignmentType.JUSTIFIED,
+    indent: { firstLine: INDENT_FIRST_LINE_1_25CM },
+    spacing: { line: LINE_SPACING_1_15, after: SPACING_AFTER_6PT },
+    children: [
+      new TextRun({
+        text,
+        size: FONT_SIZE_DOCX_BODY,
+        font: ASSESSMENT_DOCX_FONT,
+        bold: options?.bold,
+        italics: options?.italics,
+        color: ASSESSMENT_DOCX_BLACK,
+      }),
+    ],
+  });
+}
+
+function createAssessmentTableHeaderCell(
+  text: string,
+  widthPercent: number,
+  alignment: (typeof AlignmentType)[keyof typeof AlignmentType] = AlignmentType.CENTER
+): TableCell {
+  return new TableCell({
+    width: { size: widthPercent, type: WidthType.PERCENTAGE },
+    shading: { type: ShadingType.CLEAR, fill: 'F8FAFC' },
+    margins: { top: 120, bottom: 120, left: 120, right: 120 },
+    children: [
+      new Paragraph({
+        alignment,
+        children: [
+          new TextRun({
+            text,
+            bold: true,
+            size: FONT_SIZE_DOCX_TABLE,
+            font: ASSESSMENT_DOCX_FONT,
+            color: ASSESSMENT_DOCX_BLACK,
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+function createAssessmentTableDataCell(
+  text: string,
+  widthPercent: number,
+  alignment: (typeof AlignmentType)[keyof typeof AlignmentType] = AlignmentType.LEFT,
+  bold: boolean = false
+): TableCell {
+  return new TableCell({
+    width: { size: widthPercent, type: WidthType.PERCENTAGE },
+    margins: { top: 100, bottom: 100, left: 120, right: 120 },
+    children: [
+      new Paragraph({
+        alignment,
+        children: [
+          new TextRun({
+            text,
+            size: FONT_SIZE_DOCX_TABLE,
+            font: ASSESSMENT_DOCX_FONT,
+            bold,
+            color: ASSESSMENT_DOCX_BLACK,
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
 function createNormalizedAssessmentIdentityTable(
   metadata: NormalizedAssessmentDocument['metadata'],
   extraRows: [string, string][] = []
@@ -832,7 +1007,15 @@ function createNormalizedAssessmentIdentityTable(
               width: { size: 30, type: WidthType.PERCENTAGE },
               children: [
                 new Paragraph({
-                  children: [new TextRun({ text: label, bold: true, size: 20, font: 'Arial' })],
+                  children: [
+                    new TextRun({
+                      text: label,
+                      bold: true,
+                      size: FONT_SIZE_DOCX_TABLE,
+                      font: ASSESSMENT_DOCX_FONT,
+                      color: ASSESSMENT_DOCX_BLACK,
+                    }),
+                  ],
                 }),
               ],
             }),
@@ -840,7 +1023,14 @@ function createNormalizedAssessmentIdentityTable(
               width: { size: 70, type: WidthType.PERCENTAGE },
               children: [
                 new Paragraph({
-                  children: [new TextRun({ text: val, size: 20, font: 'Arial' })],
+                  children: [
+                    new TextRun({
+                      text: val,
+                      size: FONT_SIZE_DOCX_TABLE,
+                      font: ASSESSMENT_DOCX_FONT,
+                      color: ASSESSMENT_DOCX_BLACK,
+                    }),
+                  ],
                 }),
               ],
             }),
@@ -902,10 +1092,24 @@ function createNormalizedAssessmentSignoffBlock(
             width: { size: 50, type: WidthType.PERCENTAGE },
             children: [
               new Paragraph({
-                children: [new TextRun({ text: 'Mengetahui,', size: 20, font: 'Arial' })],
+                children: [
+                  new TextRun({
+                    text: 'Mengetahui,',
+                    size: FONT_SIZE_DOCX_SIGNOFF,
+                    font: ASSESSMENT_DOCX_FONT,
+                    color: ASSESSMENT_DOCX_BLACK,
+                  }),
+                ],
               }),
               new Paragraph({
-                children: [new TextRun({ text: principalTitle, size: 20, font: 'Arial' })],
+                children: [
+                  new TextRun({
+                    text: principalTitle,
+                    size: FONT_SIZE_DOCX_SIGNOFF,
+                    font: ASSESSMENT_DOCX_FONT,
+                    color: ASSESSMENT_DOCX_BLACK,
+                  }),
+                ],
               }),
               new Paragraph({ spacing: { after: 720 } }),
               new Paragraph({
@@ -913,9 +1117,10 @@ function createNormalizedAssessmentSignoffBlock(
                   new TextRun({
                     text: principalNameText,
                     bold: !isBlankMode && !!signoff.principalName,
-                    size: 20,
-                    font: 'Arial',
+                    size: FONT_SIZE_DOCX_SIGNOFF,
+                    font: ASSESSMENT_DOCX_FONT,
                     underline: !isBlankMode && signoff.principalName ? {} : undefined,
+                    color: ASSESSMENT_DOCX_BLACK,
                   }),
                 ],
               }),
@@ -923,8 +1128,9 @@ function createNormalizedAssessmentSignoffBlock(
                 children: [
                   new TextRun({
                     text: principalNipText,
-                    size: 20,
-                    font: 'Arial',
+                    size: FONT_SIZE_DOCX_SIGNOFF,
+                    font: ASSESSMENT_DOCX_FONT,
+                    color: ASSESSMENT_DOCX_BLACK,
                   }),
                 ],
               }),
@@ -934,10 +1140,24 @@ function createNormalizedAssessmentSignoffBlock(
             width: { size: 50, type: WidthType.PERCENTAGE },
             children: [
               new Paragraph({
-                children: [new TextRun({ text: dateStr, size: 20, font: 'Arial' })],
+                children: [
+                  new TextRun({
+                    text: dateStr,
+                    size: FONT_SIZE_DOCX_SIGNOFF,
+                    font: ASSESSMENT_DOCX_FONT,
+                    color: ASSESSMENT_DOCX_BLACK,
+                  }),
+                ],
               }),
               new Paragraph({
-                children: [new TextRun({ text: teacherTitle, size: 20, font: 'Arial' })],
+                children: [
+                  new TextRun({
+                    text: teacherTitle,
+                    size: FONT_SIZE_DOCX_SIGNOFF,
+                    font: ASSESSMENT_DOCX_FONT,
+                    color: ASSESSMENT_DOCX_BLACK,
+                  }),
+                ],
               }),
               new Paragraph({ spacing: { after: 720 } }),
               new Paragraph({
@@ -945,9 +1165,10 @@ function createNormalizedAssessmentSignoffBlock(
                   new TextRun({
                     text: teacherNameText,
                     bold: !isBlankMode && !!signoff.teacherName,
-                    size: 20,
-                    font: 'Arial',
+                    size: FONT_SIZE_DOCX_SIGNOFF,
+                    font: ASSESSMENT_DOCX_FONT,
                     underline: !isBlankMode && signoff.teacherName ? {} : undefined,
+                    color: ASSESSMENT_DOCX_BLACK,
                   }),
                 ],
               }),
@@ -955,8 +1176,9 @@ function createNormalizedAssessmentSignoffBlock(
                 children: [
                   new TextRun({
                     text: teacherNipText,
-                    size: 20,
-                    font: 'Arial',
+                    size: FONT_SIZE_DOCX_SIGNOFF,
+                    font: ASSESSMENT_DOCX_FONT,
+                    color: ASSESSMENT_DOCX_BLACK,
                   }),
                 ],
               }),
@@ -989,7 +1211,7 @@ export async function renderAssessmentDocx(
 
   // Header & Identity
   docChildren.push(
-    ...createDocumentHeader(model.metadata.title, model.metadata.subTitle)
+    ...createAssessmentDocumentHeader(model.metadata.title, model.metadata.subTitle)
   );
   docChildren.push(
     createNormalizedAssessmentIdentityTable(model.metadata, extraIdentityRows)
@@ -997,40 +1219,27 @@ export async function renderAssessmentDocx(
   docChildren.push(new Paragraph({ spacing: { after: 240 } }));
 
   // SECTION I: Kisi-Kisi
-  docChildren.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: model.kisiKisi.title,
-          bold: true,
-          size: 22,
-          font: 'Arial',
-          color: '1E3A8A',
-        }),
-      ],
-      spacing: { before: 200, after: 120 },
-    })
-  );
+  docChildren.push(createAssessmentSectionHeading(model.kisiKisi.title));
 
   const kisiKisiTableRows: TableRow[] = [
     new TableRow({
       children: [
-        createTableHeaderCell('No', 8),
-        createTableHeaderCell('Tujuan Pembelajaran / KD', 36, AlignmentType.LEFT),
-        createTableHeaderCell('Indikator Asesmen', 26, AlignmentType.LEFT),
-        createTableHeaderCell('Materi / Lingkup', 15, AlignmentType.LEFT),
-        createTableHeaderCell('Bentuk', 15),
+        createAssessmentTableHeaderCell('No', 8),
+        createAssessmentTableHeaderCell('Tujuan Pembelajaran / KD', 36, AlignmentType.LEFT),
+        createAssessmentTableHeaderCell('Indikator Asesmen', 26, AlignmentType.LEFT),
+        createAssessmentTableHeaderCell('Materi / Lingkup', 15, AlignmentType.LEFT),
+        createAssessmentTableHeaderCell('Bentuk', 15),
       ],
     }),
     ...model.kisiKisi.rows.map(
       (r) =>
         new TableRow({
           children: [
-            createTableDataCell(String(r.no), 8, AlignmentType.CENTER),
-            createTableDataCell(r.tpCodeAndStatement, 36),
-            createTableDataCell(r.indicator, 26),
-            createTableDataCell(r.material, 15),
-            createTableDataCell(r.instrumentType, 15, AlignmentType.CENTER),
+            createAssessmentTableDataCell(String(r.no), 8, AlignmentType.CENTER),
+            createAssessmentTableDataCell(r.tpCodeAndStatement, 36),
+            createAssessmentTableDataCell(r.indicator, 26),
+            createAssessmentTableDataCell(r.material, 15),
+            createAssessmentTableDataCell(r.instrumentType, 15, AlignmentType.CENTER),
           ],
         })
     ),
@@ -1045,20 +1254,7 @@ export async function renderAssessmentDocx(
   docChildren.push(new Paragraph({ spacing: { after: 240 } }));
 
   // SECTION II: Instrumen Asesmen
-  docChildren.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: model.instruments.title,
-          bold: true,
-          size: 22,
-          font: 'Arial',
-          color: '1E3A8A',
-        }),
-      ],
-      spacing: { before: 200, after: 120 },
-    })
-  );
+  docChildren.push(createAssessmentSectionHeading(model.instruments.title));
 
   if (model.instruments.list.length === 0) {
     docChildren.push(
@@ -1069,9 +1265,9 @@ export async function renderAssessmentDocx(
               ? '(Kolom instrumen dapat dituliskan langsung oleh guru)'
               : 'Belum ada instrumen yang dimuat dalam paket ini.',
             italics: true,
-            size: 20,
-            font: 'Arial',
-            color: '64748B',
+            size: FONT_SIZE_DOCX_BODY,
+            font: ASSESSMENT_DOCX_FONT,
+            color: ASSESSMENT_DOCX_BLACK,
           }),
         ],
         spacing: { after: 120 },
@@ -1086,9 +1282,9 @@ export async function renderAssessmentDocx(
           new TextRun({
             text: `${instIdx + 1}. [${inst.typeLabel}] ${inst.title || ''}`,
             bold: true,
-            size: 20,
-            font: 'Arial',
-            color: '0F172A',
+            size: FONT_SIZE_DOCX_BODY,
+            font: ASSESSMENT_DOCX_FONT,
+            color: ASSESSMENT_DOCX_BLACK,
           }),
         ],
         spacing: { before: 140, after: 80 },
@@ -1097,18 +1293,7 @@ export async function renderAssessmentDocx(
 
     if (inst.instructions) {
       docChildren.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `Petunjuk: ${inst.instructions}`,
-              italics: true,
-              size: 19,
-              font: 'Arial',
-              color: '475569',
-            }),
-          ],
-          spacing: { after: 100 },
-        })
+        createAssessmentNarrativeParagraph(`Petunjuk: ${inst.instructions}`, { italics: true })
       );
     }
 
@@ -1117,17 +1302,7 @@ export async function renderAssessmentDocx(
       inst.writtenItems.forEach((it) => {
         if (it.stimulus) {
           docChildren.push(
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `Stimulus:\n${it.stimulus}`,
-                  size: 19,
-                  font: 'Arial',
-                  color: '334155',
-                }),
-              ],
-              spacing: { before: 60, after: 40 },
-            })
+            createAssessmentNarrativeParagraph(`Stimulus:\n${it.stimulus}`)
           );
         }
 
@@ -1136,8 +1311,9 @@ export async function renderAssessmentDocx(
             children: [
               new TextRun({
                 text: `${it.no}. ${it.prompt}`,
-                size: 20,
-                font: 'Arial',
+                size: FONT_SIZE_DOCX_BODY,
+                font: ASSESSMENT_DOCX_FONT,
+                color: ASSESSMENT_DOCX_BLACK,
               }),
             ],
             spacing: { before: 40, after: 40 },
@@ -1152,8 +1328,9 @@ export async function renderAssessmentDocx(
                 children: [
                   new TextRun({
                     text: `${opt.label}. ${opt.text}`,
-                    size: 19,
-                    font: 'Arial',
+                    size: FONT_SIZE_DOCX_BODY,
+                    font: ASSESSMENT_DOCX_FONT,
+                    color: ASSESSMENT_DOCX_BLACK,
                   }),
                 ],
                 spacing: { after: 20 },
@@ -1165,25 +1342,25 @@ export async function renderAssessmentDocx(
     } else if (inst.type === 'PERFORMANCE') {
       if (inst.task) {
         docChildren.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: 'Tugas Praktik/Kinerja: ', bold: true, size: 19, font: 'Arial' }),
-              new TextRun({ text: inst.task, size: 19, font: 'Arial' }),
-            ],
-            spacing: { after: 60 },
-          })
+          createAssessmentNarrativeParagraph(`Tugas Praktik/Kinerja: ${inst.task}`)
         );
       }
       if (inst.performanceAspects && inst.performanceAspects.length > 0) {
         docChildren.push(
           new Paragraph({
             children: [
-              new TextRun({ text: 'Aspek yang Dinilai:', bold: true, size: 19, font: 'Arial' }),
+              new TextRun({
+                text: 'Aspek yang Dinilai:',
+                bold: true,
+                size: FONT_SIZE_DOCX_BODY,
+                font: ASSESSMENT_DOCX_FONT,
+                color: ASSESSMENT_DOCX_BLACK,
+              }),
             ],
             spacing: { after: 40 },
           })
         );
-        inst.performanceAspects.forEach((asp, aIdx) => {
+        inst.performanceAspects.forEach((asp) => {
           let text = `- ${asp.label}${asp.description ? `: ${asp.description}` : ''}`;
           if (asp.weight !== undefined) {
             text += ` — Bobot: ${asp.weight}`;
@@ -1194,8 +1371,9 @@ export async function renderAssessmentDocx(
               children: [
                 new TextRun({
                   text,
-                  size: 19,
-                  font: 'Arial',
+                  size: FONT_SIZE_DOCX_BODY,
+                  font: ASSESSMENT_DOCX_FONT,
+                  color: ASSESSMENT_DOCX_BLACK,
                 }),
               ],
               spacing: { after: 20 },
@@ -1206,59 +1384,29 @@ export async function renderAssessmentDocx(
     } else if (inst.type === 'ASSIGNMENT') {
       if (inst.expectedOutput) {
         docChildren.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: 'Hasil / Luaran: ', bold: true, size: 19, font: 'Arial' }),
-              new TextRun({ text: inst.expectedOutput, size: 19, font: 'Arial' }),
-            ],
-            spacing: { after: 60 },
-          })
+          createAssessmentNarrativeParagraph(`Hasil / Luaran: ${inst.expectedOutput}`)
         );
       }
     } else if (inst.type === 'PROJECT') {
       if (inst.projectBrief) {
         docChildren.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: 'Deskripsi Proyek: ', bold: true, size: 19, font: 'Arial' }),
-              new TextRun({ text: inst.projectBrief, size: 19, font: 'Arial' }),
-            ],
-            spacing: { after: 40 },
-          })
+          createAssessmentNarrativeParagraph(`Deskripsi Proyek: ${inst.projectBrief}`)
         );
       }
       if (inst.expectedDeliverable) {
         docChildren.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: 'Luaran Proyek: ', bold: true, size: 19, font: 'Arial' }),
-              new TextRun({ text: inst.expectedDeliverable, size: 19, font: 'Arial' }),
-            ],
-            spacing: { after: 60 },
-          })
+          createAssessmentNarrativeParagraph(`Luaran Proyek: ${inst.expectedDeliverable}`)
         );
       }
     } else if (inst.type === 'PRODUCT') {
       if (inst.productBrief) {
         docChildren.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: 'Spesifikasi Produk: ', bold: true, size: 19, font: 'Arial' }),
-              new TextRun({ text: inst.productBrief, size: 19, font: 'Arial' }),
-            ],
-            spacing: { after: 40 },
-          })
+          createAssessmentNarrativeParagraph(`Spesifikasi Produk: ${inst.productBrief}`)
         );
       }
       if (inst.expectedProduct) {
         docChildren.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: 'Produk / Hasil yang Diharapkan: ', bold: true, size: 19, font: 'Arial' }),
-              new TextRun({ text: inst.expectedProduct, size: 19, font: 'Arial' }),
-            ],
-            spacing: { after: 60 },
-          })
+          createAssessmentNarrativeParagraph(`Produk / Hasil yang Diharapkan: ${inst.expectedProduct}`)
         );
       }
     } else if (inst.type === 'PORTFOLIO') {
@@ -1266,7 +1414,13 @@ export async function renderAssessmentDocx(
         docChildren.push(
           new Paragraph({
             children: [
-              new TextRun({ text: 'Dokumen Bukti Karya: ', bold: true, size: 19, font: 'Arial' }),
+              new TextRun({
+                text: 'Dokumen Bukti Karya:',
+                bold: true,
+                size: FONT_SIZE_DOCX_BODY,
+                font: ASSESSMENT_DOCX_FONT,
+                color: ASSESSMENT_DOCX_BLACK,
+              }),
             ],
             spacing: { after: 40 },
           })
@@ -1275,7 +1429,14 @@ export async function renderAssessmentDocx(
           docChildren.push(
             new Paragraph({
               indent: { left: 360 },
-              children: [new TextRun({ text: `• ${ev}`, size: 19, font: 'Arial' })],
+              children: [
+                new TextRun({
+                  text: `• ${ev}`,
+                  size: FONT_SIZE_DOCX_BODY,
+                  font: ASSESSMENT_DOCX_FONT,
+                  color: ASSESSMENT_DOCX_BLACK,
+                }),
+              ],
               spacing: { after: 20 },
             })
           );
@@ -1284,31 +1445,25 @@ export async function renderAssessmentDocx(
     } else if (inst.type === 'OBSERVATION') {
       if (inst.recordingScheme) {
         docChildren.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: 'Skema Pencatatan: ', bold: true, size: 19, font: 'Arial' }),
-              new TextRun({ text: inst.recordingScheme, size: 19, font: 'Arial' }),
-            ],
-            spacing: { after: 40 },
-          })
+          createAssessmentNarrativeParagraph(`Skema Pencatatan: ${inst.recordingScheme}`)
         );
       }
       if (inst.observationAspects && inst.observationAspects.length > 0) {
         const obsRows = [
           new TableRow({
             children: [
-              createTableHeaderCell('No', 10),
-              createTableHeaderCell('Aspek Pengamatan', 45, AlignmentType.LEFT),
-              createTableHeaderCell('Indikator', 45, AlignmentType.LEFT),
+              createAssessmentTableHeaderCell('No', 10),
+              createAssessmentTableHeaderCell('Aspek Pengamatan', 45, AlignmentType.LEFT),
+              createAssessmentTableHeaderCell('Indikator', 45, AlignmentType.LEFT),
             ],
           }),
           ...inst.observationAspects.map(
             (asp, aIdx) =>
               new TableRow({
                 children: [
-                  createTableDataCell(String(aIdx + 1), 10, AlignmentType.CENTER),
-                  createTableDataCell(asp.label, 45),
-                  createTableDataCell(asp.indicator || '-', 45),
+                  createAssessmentTableDataCell(String(aIdx + 1), 10, AlignmentType.CENTER),
+                  createAssessmentTableDataCell(asp.label, 45),
+                  createAssessmentTableDataCell(asp.indicator || '-', 45),
                 ],
               })
           ),
@@ -1325,7 +1480,12 @@ export async function renderAssessmentDocx(
         docChildren.push(
           new Paragraph({
             children: [
-              new TextRun({ text: `${it.no}. ${it.prompt}`, size: 20, font: 'Arial' }),
+              new TextRun({
+                text: `${it.no}. ${it.prompt}`,
+                size: FONT_SIZE_DOCX_BODY,
+                font: ASSESSMENT_DOCX_FONT,
+                color: ASSESSMENT_DOCX_BLACK,
+              }),
             ],
             spacing: { before: 40, after: 20 },
           })
@@ -1340,7 +1500,12 @@ export async function renderAssessmentDocx(
         docChildren.push(
           new Paragraph({
             children: [
-              new TextRun({ text, size: 20, font: 'Arial' }),
+              new TextRun({
+                text,
+                size: FONT_SIZE_DOCX_BODY,
+                font: ASSESSMENT_DOCX_FONT,
+                color: ASSESSMENT_DOCX_BLACK,
+              }),
             ],
             spacing: { before: 40, after: 20 },
           })
@@ -1353,38 +1518,25 @@ export async function renderAssessmentDocx(
 
   // SECTION III: Kunci Jawaban
   if (model.answerKeys.list.length > 0) {
-    docChildren.push(
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: model.answerKeys.title,
-            bold: true,
-            size: 22,
-            font: 'Arial',
-            color: '1E3A8A',
-          }),
-        ],
-        spacing: { before: 200, after: 120 },
-      })
-    );
+    docChildren.push(createAssessmentSectionHeading(model.answerKeys.title));
 
     const akRows = [
       new TableRow({
         children: [
-          createTableHeaderCell('No. Butir', 12),
-          createTableHeaderCell('Tipe Kunci', 25),
-          createTableHeaderCell('Kunci Jawaban', 40, AlignmentType.LEFT),
-          createTableHeaderCell('Keterangan / Penjelasan', 23, AlignmentType.LEFT),
+          createAssessmentTableHeaderCell('No. Butir', 12),
+          createAssessmentTableHeaderCell('Tipe Kunci', 25),
+          createAssessmentTableHeaderCell('Kunci Jawaban', 40, AlignmentType.LEFT),
+          createAssessmentTableHeaderCell('Keterangan / Penjelasan', 23, AlignmentType.LEFT),
         ],
       }),
       ...model.answerKeys.list.map(
         (ak) =>
           new TableRow({
             children: [
-              createTableDataCell(String(ak.itemNumber || '-'), 12, AlignmentType.CENTER),
-              createTableDataCell(ak.answerType, 25, AlignmentType.CENTER),
-              createTableDataCell(ak.value || '-', 40, AlignmentType.LEFT, true),
-              createTableDataCell(ak.notes || '-', 23),
+              createAssessmentTableDataCell(String(ak.itemNumber || '-'), 12, AlignmentType.CENTER),
+              createAssessmentTableDataCell(ak.answerType, 25, AlignmentType.CENTER),
+              createAssessmentTableDataCell(ak.value || '-', 40, AlignmentType.LEFT, true),
+              createAssessmentTableDataCell(ak.notes || '-', 23),
             ],
           })
       ),
@@ -1401,20 +1553,7 @@ export async function renderAssessmentDocx(
 
   // SECTION IV: Pedoman Penskoran
   if (model.scoringGuides.list.length > 0) {
-    docChildren.push(
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: model.scoringGuides.title,
-            bold: true,
-            size: 22,
-            font: 'Arial',
-            color: '1E3A8A',
-          }),
-        ],
-        spacing: { before: 200, after: 120 },
-      })
-    );
+    docChildren.push(createAssessmentSectionHeading(model.scoringGuides.title));
 
     model.scoringGuides.list.forEach((sg, sgIdx) => {
       docChildren.push(
@@ -1423,8 +1562,9 @@ export async function renderAssessmentDocx(
             new TextRun({
               text: `${sgIdx + 1}. ${sg.title} [Skor Maks: ${sg.maxScore ?? '-'}]`,
               bold: true,
-              size: 20,
-              font: 'Arial',
+              size: FONT_SIZE_DOCX_BODY,
+              font: ASSESSMENT_DOCX_FONT,
+              color: ASSESSMENT_DOCX_BLACK,
             }),
           ],
           spacing: { before: 60, after: 20 },
@@ -1432,10 +1572,7 @@ export async function renderAssessmentDocx(
       );
       if (sg.instructions) {
         docChildren.push(
-          new Paragraph({
-            children: [new TextRun({ text: sg.instructions, size: 19, font: 'Arial' })],
-            spacing: { after: 40 },
-          })
+          createAssessmentNarrativeParagraph(sg.instructions)
         );
       }
     });
@@ -1444,20 +1581,7 @@ export async function renderAssessmentDocx(
 
   // SECTION V: Rubrik Penilaian
   if (model.rubrics.list.length > 0) {
-    docChildren.push(
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: model.rubrics.title,
-            bold: true,
-            size: 22,
-            font: 'Arial',
-            color: '1E3A8A',
-          }),
-        ],
-        spacing: { before: 200, after: 120 },
-      })
-    );
+    docChildren.push(createAssessmentSectionHeading(model.rubrics.title));
 
     model.rubrics.list.forEach((rub, rIdx) => {
       docChildren.push(
@@ -1466,8 +1590,9 @@ export async function renderAssessmentDocx(
             new TextRun({
               text: `${rIdx + 1}. ${rub.title}`,
               bold: true,
-              size: 20,
-              font: 'Arial',
+              size: FONT_SIZE_DOCX_BODY,
+              font: ASSESSMENT_DOCX_FONT,
+              color: ASSESSMENT_DOCX_BLACK,
             }),
           ],
           spacing: { before: 60, after: 60 },
@@ -1479,9 +1604,9 @@ export async function renderAssessmentDocx(
       const scaleWidth = Math.floor(70 / (rub.scale.length || 1));
 
       const headerCells: TableCell[] = [
-        createTableHeaderCell('Kriteria Penilaian', critWidth, AlignmentType.LEFT),
+        createAssessmentTableHeaderCell('Kriteria Penilaian', critWidth, AlignmentType.LEFT),
         ...rub.scale.map((s) =>
-          createTableHeaderCell(
+          createAssessmentTableHeaderCell(
             s.score !== undefined ? `${s.label} (${s.score})` : s.label,
             scaleWidth
           )
@@ -1494,13 +1619,13 @@ export async function renderAssessmentDocx(
           (c) =>
             new TableRow({
               children: [
-                createTableDataCell(
+                createAssessmentTableDataCell(
                   c.weight !== undefined ? `${c.label} — Bobot: ${c.weight}` : c.label,
                   critWidth,
                   AlignmentType.LEFT,
                   true
                 ),
-                ...c.descriptors.map((d) => createTableDataCell(d, scaleWidth)),
+                ...c.descriptors.map((d) => createAssessmentTableDataCell(d, scaleWidth)),
               ],
             })
         ),

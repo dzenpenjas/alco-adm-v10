@@ -1520,7 +1520,7 @@ export function mapGeneratedUnitsToAssessmentPackage(
         instruments.push({
           id: instId,
           type: 'WRITTEN_TEST',
-          title: 'Instrumen Tes Tertulis (Draf AI)',
+          title: 'Instrumen Tes Tertulis',
           instructions: undefined,
           items: writtenItems,
         });
@@ -1550,7 +1550,7 @@ export function mapGeneratedUnitsToAssessmentPackage(
         instruments.push({
           id: instId,
           type: 'ORAL_TEST',
-          title: 'Instrumen Tes Lisan (Draf AI)',
+          title: 'Instrumen Tes Lisan',
           instructions: undefined,
           items: oralItems,
         });
@@ -1581,8 +1581,8 @@ export function mapGeneratedUnitsToAssessmentPackage(
           id: instId,
           type: instType,
           title: isSelf
-            ? 'Instrumen Penilaian Diri (Draf AI)'
-            : 'Instrumen Penilaian Antar-Teman (Draf AI)',
+            ? 'Instrumen Penilaian Diri'
+            : 'Instrumen Penilaian Antar-Teman',
           instructions: undefined,
           items: selfPeerItems,
         } as SelfPeerAssessmentInstrument);
@@ -1688,7 +1688,7 @@ export function mapGeneratedUnitsToAssessmentPackage(
         instruments.push({
           id: instId,
           type: 'PERFORMANCE',
-          title: 'Instrumen Penilaian Kinerja / Praktik (Draf AI)',
+          title: 'Instrumen Penilaian Kinerja / Praktik',
           task: combinedTask!,
           instructions: performanceInstructions,
           aspects: aspects.length > 0 ? aspects : undefined,
@@ -1766,7 +1766,7 @@ export function mapGeneratedUnitsToAssessmentPackage(
         instruments.push({
           id: instId,
           type: 'OBSERVATION',
-          title: 'Instrumen Lembar Pengamatan / Observasi (Draf AI)',
+          title: 'Instrumen Lembar Pengamatan / Observasi',
           instructions: obsInstructions,
           recordingScheme,
           aspects,
@@ -1831,7 +1831,7 @@ export function mapGeneratedUnitsToAssessmentPackage(
         instruments.push({
           id: instId,
           type: 'PORTFOLIO',
-          title: 'Instrumen Asesmen Portofolio (Draf AI)',
+          title: 'Instrumen Asesmen Portofolio',
           instructions: portfolioInstructions,
           evidenceRequirements: evidenceReqs,
           rubricId,
@@ -1861,7 +1861,7 @@ export function mapGeneratedUnitsToAssessmentPackage(
             rubricId = createDeterministicRubricId(instId, 1);
             rubrics.push({
               id: rubricId,
-              title: taskUnit.rubricDraft.title || 'Rubrik Penugasan (Draf AI)',
+              title: taskUnit.rubricDraft.title || 'Rubrik Penugasan',
               instrumentId: instId,
               criteria: (taskUnit.rubricDraft.criteria || []).map((c, cIdx) => ({
                 id: `crit-${rubricId}-${cIdx + 1}`,
@@ -1896,7 +1896,7 @@ export function mapGeneratedUnitsToAssessmentPackage(
         instruments.push({
           id: instId,
           type: 'ASSIGNMENT',
-          title: 'Instrumen Penugasan (Draf AI)',
+          title: 'Instrumen Penugasan',
           instructions: assignmentInstructions!,
           expectedOutput,
           rubricId,
@@ -1926,7 +1926,7 @@ export function mapGeneratedUnitsToAssessmentPackage(
             rubricId = createDeterministicRubricId(instId, 1);
             rubrics.push({
               id: rubricId,
-              title: taskUnit.rubricDraft.title || 'Rubrik Proyek (Draf AI)',
+              title: taskUnit.rubricDraft.title || 'Rubrik Proyek',
               instrumentId: instId,
               criteria: (taskUnit.rubricDraft.criteria || []).map((c, cIdx) => ({
                 id: `crit-${rubricId}-${cIdx + 1}`,
@@ -1961,7 +1961,7 @@ export function mapGeneratedUnitsToAssessmentPackage(
         instruments.push({
           id: instId,
           type: 'PROJECT',
-          title: 'Instrumen Penilaian Proyek (Draf AI)',
+          title: 'Instrumen Penilaian Proyek',
           projectBrief: projectBrief!,
           expectedDeliverable,
           rubricId,
@@ -1991,7 +1991,7 @@ export function mapGeneratedUnitsToAssessmentPackage(
             rubricId = createDeterministicRubricId(instId, 1);
             rubrics.push({
               id: rubricId,
-              title: taskUnit.rubricDraft.title || 'Rubrik Penilaian Produk (Draf AI)',
+              title: taskUnit.rubricDraft.title || 'Rubrik Penilaian Produk',
               instrumentId: instId,
               criteria: (taskUnit.rubricDraft.criteria || []).map((c, cIdx) => ({
                 id: `crit-${rubricId}-${cIdx + 1}`,
@@ -2026,7 +2026,7 @@ export function mapGeneratedUnitsToAssessmentPackage(
         instruments.push({
           id: instId,
           type: 'PRODUCT',
-          title: 'Instrumen Penilaian Produk (Draf AI)',
+          title: 'Instrumen Penilaian Produk',
           productBrief: productBrief!,
           expectedProduct,
           rubricId,
@@ -2100,7 +2100,7 @@ export function mapGeneratedUnitsToAssessmentPackage(
     id: pkgId,
     assessmentPlanId: contract.assessmentPlanId,
     academicSettingId: contract.academicSettingId,
-    title: `Perangkat Asesmen - ${contract.subjectProfile.subjectLabel || contract.subjectProfile.subjectKey} (Draf AI)`,
+    title: `Perangkat Asesmen - ${contract.subjectProfile.subjectLabel || contract.subjectProfile.subjectKey}`,
     blueprintItems,
     instruments,
     answerKeys,

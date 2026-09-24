@@ -37,7 +37,7 @@ function runTests() {
 
   console.log('=== B.1.2e ASSESSMENT CONTENT FIDELITY REGRESSION SUITE ===\n');
 
-  const basePlan: AssessmentGenerationPlan = {
+  const basePlan: any = {
     planId: 'plan-b12e',
     allocationUnits: [],
     coverageUnits: [
@@ -72,7 +72,7 @@ function runTests() {
   // TEST 1 — PERFORMANCE PRESERVES INSTRUCTIONS
   // ----------------------------------------------------
   test('TEST 1: Performance preserves instructions when provided', () => {
-    const contract: AssessmentGenerationContract = {
+    const contract: any = {
       assessmentPlanId: 'plan-b12e',
       subjectProfile: defaultSubjectProfile,
       units: [
@@ -112,7 +112,7 @@ function runTests() {
   // TEST 2 — PERFORMANCE DOES NOT INVENT INSTRUCTIONS
   // ----------------------------------------------------
   test('TEST 2: Performance does not invent instructions when missing from AI', () => {
-    const contract: AssessmentGenerationContract = {
+    const contract: any = {
       assessmentPlanId: 'plan-b12e',
       subjectProfile: defaultSubjectProfile,
       units: [
@@ -151,7 +151,7 @@ function runTests() {
   // TEST 3 — PERFORMANCE ASPECT WEIGHT
   // ----------------------------------------------------
   test('TEST 3: Performance aspect weights are preserved in package and normalized model', () => {
-    const contract: AssessmentGenerationContract = {
+    const contract: any = {
       assessmentPlanId: 'plan-b12e',
       subjectProfile: defaultSubjectProfile,
       units: [
@@ -214,7 +214,7 @@ function runTests() {
   // TEST 4 — ASSIGNMENT EXPECTED OUTPUT
   // ----------------------------------------------------
   test('TEST 4: Assignment maps expectedDeliverable to expectedOutput and preserves explicit instructions', () => {
-    const contract: AssessmentGenerationContract = {
+    const contract: any = {
       assessmentPlanId: 'plan-b12e',
       subjectProfile: defaultSubjectProfile,
       units: [
@@ -270,7 +270,7 @@ function runTests() {
   // TEST 5 — PROJECT EXPECTED DELIVERABLE
   // ----------------------------------------------------
   test('TEST 5: Project maps taskPrompt to projectBrief and preserves expectedDeliverable', () => {
-    const contract: AssessmentGenerationContract = {
+    const contract: any = {
       assessmentPlanId: 'plan-b12e',
       subjectProfile: defaultSubjectProfile,
       units: [
@@ -328,7 +328,7 @@ function runTests() {
   // TEST 6 — PRODUCT EXPECTED PRODUCT
   // ----------------------------------------------------
   test('TEST 6: Product maps taskPrompt to productBrief and expectedDeliverable to expectedProduct', () => {
-    const contract: AssessmentGenerationContract = {
+    const contract: any = {
       assessmentPlanId: 'plan-b12e',
       subjectProfile: defaultSubjectProfile,
       units: [
@@ -386,7 +386,7 @@ function runTests() {
   // TEST 7 — RUBRIC CRITERIA WEIGHT PRESERVED
   // ----------------------------------------------------
   test('TEST 7: Rubric criteria weights are preserved in package and normalized model (PROJECT)', () => {
-    const contract: AssessmentGenerationContract = {
+    const contract: any = {
       assessmentPlanId: 'plan-b12e',
       subjectProfile: defaultSubjectProfile,
       units: [
@@ -453,7 +453,7 @@ function runTests() {
   // TEST 7b — ASSIGNMENT RUBRIC WEIGHT PRESERVED
   // ----------------------------------------------------
   test('TEST 7b: Assignment rubric criteria weights are preserved in package and normalized model', () => {
-    const contract: AssessmentGenerationContract = {
+    const contract: any = {
       assessmentPlanId: 'plan-b12e',
       subjectProfile: defaultSubjectProfile,
       units: [
@@ -530,7 +530,7 @@ function runTests() {
   // TEST 7c — PRODUCT RUBRIC WEIGHT PRESERVED
   // ----------------------------------------------------
   test('TEST 7c: Product rubric criteria weights are preserved in package and normalized model', () => {
-    const contract: AssessmentGenerationContract = {
+    const contract: any = {
       assessmentPlanId: 'plan-b12e',
       subjectProfile: defaultSubjectProfile,
       units: [
@@ -629,9 +629,11 @@ function runTests() {
       needsReview: false,
       revision: 1,
       provenance: {
-        generatedBy: 'TEACHER',
+        generatedBy: 'USER',
         generatedAt: new Date().toISOString(),
       },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     const result = validateAssessmentPackage(portfolioPkg, {
@@ -674,9 +676,11 @@ function runTests() {
       needsReview: false,
       revision: 1,
       provenance: {
-        generatedBy: 'TEACHER',
+        generatedBy: 'USER',
         generatedAt: new Date().toISOString(),
       },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     const result = validateAssessmentPackage(invalidPortfolioPkg, {
@@ -720,9 +724,11 @@ function runTests() {
       needsReview: false,
       revision: 1,
       provenance: {
-        generatedBy: 'TEACHER',
+        generatedBy: 'USER',
         generatedAt: new Date().toISOString(),
       },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     const result = validateAssessmentPackage(invalidPortfolioPkg, {
@@ -803,7 +809,7 @@ function runTests() {
     );
 
     // Behavioral test: when expectedDeliverable is undefined, instruments must keep them undefined
-    const contract: AssessmentGenerationContract = {
+    const contract: any = {
       assessmentPlanId: 'plan-b12e',
       subjectProfile: defaultSubjectProfile,
       units: [
