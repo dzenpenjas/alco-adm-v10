@@ -1083,9 +1083,22 @@ export function validateAssessmentPackage(
     if (!rub.scale || rub.scale.length === 0) {
       errors.push(`Rubrik ${rubName} wajib memiliki minimal 1 tingkat skala penilaian.`);
     } else {
+      const seenRubricScaleOrders = new Set<number>();
       rub.scale.forEach((sc, sIdx) => {
         if (!sc.label || sc.label.trim() === '') {
           errors.push(`Tingkat skala #${sIdx + 1} pada rubrik ${rubName} belum memiliki label.`);
+        }
+
+        if (!Number.isInteger(sc.order) || sc.order <= 0) {
+          errors.push(
+            `Tingkat skala #${sIdx + 1} pada rubrik ${rubName} memiliki order canonical tidak valid [${sc.order}].`
+          );
+        } else if (seenRubricScaleOrders.has(sc.order)) {
+          errors.push(
+            `Terdapat duplicate order canonical pada skala rubrik ${rubName} [${sc.order}].`
+          );
+        } else {
+          seenRubricScaleOrders.add(sc.order);
         }
       });
     }

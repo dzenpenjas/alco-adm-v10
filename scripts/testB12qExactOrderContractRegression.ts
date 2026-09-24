@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { validateAssessmentPackage } from '../src/services/assessmentPackageService';
 import { buildNormalizedAssessmentDocumentModel } from '../src/services/documentEngine/assessmentExportService';
 import type {
@@ -652,6 +654,182 @@ console.log('\n--- 6. Additional Hardening Tests ---');
   pkg.blueprintItems[1].order = 2;
   const res = validateAssessmentPackage(pkg, mockContext);
   assert(!res.valid && res.errors.some((e) => e.includes('duplicate order canonical pada kisi-kisi [2]')), 'Test 28: Duplicate blueprint order 2, 2 → FAIL');
+}
+
+// -----------------------------------------------------------------------------
+// SECTION 7: RUBRIC SCALE ORDER TESTS
+// -----------------------------------------------------------------------------
+console.log('\n--- 7. Rubric Scale Level Order Tests ---');
+
+// Test 29: Valid rubric scale level order (1, 2) -> PASS
+{
+  const pkg = createValidBasePackage();
+  pkg.rubrics[0].scale = [
+    { id: 'sc-1', label: 'Cukup', score: 2, order: 1 },
+    { id: 'sc-2', label: 'Baik', score: 4, order: 2 },
+  ];
+  const res = validateAssessmentPackage(pkg, mockContext);
+  assert(res.valid, 'Test 29: Valid rubric scale order 1, 2 → PASS');
+}
+
+// Test 30: Rubric scale level order 0 -> FAIL
+{
+  const pkg = createValidBasePackage();
+  pkg.rubrics[0].scale = [
+    { id: 'sc-1', label: 'Cukup', score: 2, order: 0 },
+    { id: 'sc-2', label: 'Baik', score: 4, order: 2 },
+  ];
+  const res = validateAssessmentPackage(pkg, mockContext);
+  assert(!res.valid && res.errors.some((e) => e.includes('skala') && e.includes('order canonical tidak valid [0]')), 'Test 30: Rubric scale order 0 → FAIL');
+}
+
+// Test 31: Rubric scale level order -1 -> FAIL
+{
+  const pkg = createValidBasePackage();
+  pkg.rubrics[0].scale = [
+    { id: 'sc-1', label: 'Cukup', score: 2, order: -1 },
+    { id: 'sc-2', label: 'Baik', score: 4, order: 2 },
+  ];
+  const res = validateAssessmentPackage(pkg, mockContext);
+  assert(!res.valid && res.errors.some((e) => e.includes('skala') && e.includes('order canonical tidak valid [-1]')), 'Test 31: Rubric scale order -1 → FAIL');
+}
+
+// Test 32: Rubric scale level order 1.5 -> FAIL
+{
+  const pkg = createValidBasePackage();
+  pkg.rubrics[0].scale = [
+    { id: 'sc-1', label: 'Cukup', score: 2, order: 1.5 },
+    { id: 'sc-2', label: 'Baik', score: 4, order: 2 },
+  ];
+  const res = validateAssessmentPackage(pkg, mockContext);
+  assert(!res.valid && res.errors.some((e) => e.includes('skala') && e.includes('order canonical tidak valid [1.5]')), 'Test 32: Rubric scale order 1.5 → FAIL');
+}
+
+// Test 33: Rubric scale level order NaN -> FAIL
+{
+  const pkg = createValidBasePackage();
+  pkg.rubrics[0].scale = [
+    { id: 'sc-1', label: 'Cukup', score: 2, order: NaN },
+    { id: 'sc-2', label: 'Baik', score: 4, order: 2 },
+  ];
+  const res = validateAssessmentPackage(pkg, mockContext);
+  assert(!res.valid && res.errors.some((e) => e.includes('skala') && e.includes('order canonical tidak valid')), 'Test 33: Rubric scale order NaN → FAIL');
+}
+
+// Test 34: Duplicate rubric scale level order (1, 1) -> FAIL
+{
+  const pkg = createValidBasePackage();
+  pkg.rubrics[0].scale = [
+    { id: 'sc-1', label: 'Cukup', score: 2, order: 1 },
+    { id: 'sc-2', label: 'Baik', score: 4, order: 1 },
+  ];
+  const res = validateAssessmentPackage(pkg, mockContext);
+  assert(!res.valid && res.errors.some((e) => e.includes('duplicate order canonical pada skala rubrik')), 'Test 34: Duplicate rubric scale order 1, 1 → FAIL');
+}
+
+// Test 35: Non-sequential rubric scale level order (1, 3) -> PASS
+{
+  const pkg = createValidBasePackage();
+  pkg.rubrics[0].scale = [
+    { id: 'sc-1', label: 'Cukup', score: 2, order: 1 },
+    { id: 'sc-2', label: 'Sangat Baik', score: 5, order: 3 },
+  ];
+  const res = validateAssessmentPackage(pkg, mockContext);
+  assert(res.valid, 'Test 35: Non-sequential rubric scale order 1, 3 → PASS');
+}
+
+// Test 36: Export rubric scale sorting uses exact a.order - b.order
+{
+  const pkg = createValidBasePackage();
+  pkg.rubrics[0].scale = [
+    { id: 'sc-2', label: 'Tinggi', score: 5, order: 2 },
+    { id: 'sc-1', label: 'Rendah', score: 1, order: 1 },
+  ];
+
+  const snapshot: AssessmentDocumentSnapshot = {
+    snapshotId: 'snap-rubric-sort',
+    mode: 'CANONICAL_PACKAGE',
+    documentType: 'ASESMEN',
+    documentDate: '2026-09-24',
+    formattedDocumentDate: '24 September 2026',
+    assessmentPlanId: pkg.assessmentPlanId,
+    assessmentPackageId: pkg.id,
+    assessmentPackageRevision: 1,
+    packageTitle: pkg.title,
+    schoolName: 'SD Test',
+    teacherName: 'Guru Test',
+    academicYear: '2025/2026',
+    semester: '1 (Ganjil)',
+    grade: 'Kelas 10',
+    subject: 'PJOK',
+    curriculum: 'Kurikulum Merdeka',
+    documentMode: 'data',
+    generatedAt: new Date().toISOString(),
+    blueprintItems: pkg.blueprintItems,
+    instruments: pkg.instruments,
+    answerKeys: pkg.answerKeys,
+    scoringGuides: pkg.scoringGuides,
+    rubrics: pkg.rubrics,
+    resolvedObjectives: {},
+  };
+
+  const model = buildNormalizedAssessmentDocumentModel(snapshot);
+  const normRubric = model.rubrics.list[0];
+  assert(normRubric.scale[0].label === 'Rendah' && normRubric.scale[1].label === 'Tinggi', 'Test 36: Export rubric scale correctly sorted by a.order - b.order');
+}
+
+// Test 37: Zero `as any` in assessmentExportService.ts
+{
+  const exportServiceCode = fs.readFileSync(
+    path.join(process.cwd(), 'src/services/documentEngine/assessmentExportService.ts'),
+    'utf-8'
+  );
+  const asAnyMatches = exportServiceCode.match(/\bas\s+any\b/g);
+  const count = asAnyMatches ? asAnyMatches.length : 0;
+  assert(count === 0, 'Test 37: assessmentExportService.ts has strictly 0 "as any" usages');
+}
+
+// Test 38: Preservation of B.1.2n canonical option key label resolution
+{
+  const pkg = createValidBasePackage();
+  const writtenInst = pkg.instruments[0] as WrittenAssessmentInstrument;
+  writtenInst.items[0].options = [
+    { id: 'opt-a', label: 'A', text: 'Salah', isCorrect: true },
+    { id: 'opt-b', label: 'B', text: 'Benar', isCorrect: false },
+  ];
+
+  pkg.answerKeys[0].optionIds = ['opt-b'];
+
+  const snapshot: AssessmentDocumentSnapshot = {
+    snapshotId: 'snap-b12n-preservation',
+    mode: 'CANONICAL_PACKAGE',
+    documentType: 'ASESMEN',
+    documentDate: '2026-09-24',
+    formattedDocumentDate: '24 September 2026',
+    assessmentPlanId: pkg.assessmentPlanId,
+    assessmentPackageId: pkg.id,
+    assessmentPackageRevision: 1,
+    packageTitle: pkg.title,
+    schoolName: 'SD Test',
+    teacherName: 'Guru Test',
+    academicYear: '2025/2026',
+    semester: '1 (Ganjil)',
+    grade: 'Kelas 10',
+    subject: 'PJOK',
+    curriculum: 'Kurikulum Merdeka',
+    documentMode: 'data',
+    generatedAt: new Date().toISOString(),
+    blueprintItems: pkg.blueprintItems,
+    instruments: pkg.instruments,
+    answerKeys: pkg.answerKeys,
+    scoringGuides: pkg.scoringGuides,
+    rubrics: pkg.rubrics,
+    resolvedObjectives: {},
+  };
+
+  const model = buildNormalizedAssessmentDocumentModel(snapshot);
+  const mcAk = model.answerKeys.list.find((ak) => ak.answerType === 'OPTION');
+  assert(mcAk?.value === 'B', 'Test 38: Preserves B.1.2n exact linked option.label resolution (value = "B")');
 }
 
 console.log(`\n=== SUMMARY: ${passed} passed, ${failed} failed ===`);

@@ -605,7 +605,8 @@ export function buildNormalizedAssessmentDocumentModel(
           type: inst.type,
           typeLabel: getInstrumentTypeLabel(inst.type),
           title: sanitizeAssessmentVisibleTitle(inst.title) || inst.title,
-          instructions: (inst as any).instructions,
+          instructions:
+            'instructions' in inst ? inst.instructions : undefined,
         };
 
         switch (inst.type) {
@@ -776,7 +777,7 @@ export function buildNormalizedAssessmentDocumentModel(
     ? []
     : snapshot.rubrics.map((r) => {
         const sortedScale = [...(r.scale || [])].sort(
-          (a, b) => (a.order ?? 0) - (b.order ?? 0)
+          (a, b) => a.order - b.order
         );
 
         const scaleHeaders = sortedScale.map((s) => ({
