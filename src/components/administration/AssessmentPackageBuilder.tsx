@@ -46,6 +46,8 @@ import {
   RubricCriterion,
   RubricScaleLevel,
   AssessmentInstrumentType,
+  WrittenAssessmentItemType,
+  ShortAnswerResponseMode,
   MatchingAssessmentEntry,
   MatchingAssessmentPair,
   CategoryResponseStatement,
@@ -185,15 +187,18 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
 
     // 2. Intelligently detect what changed between activePackage and updated to add/merge field-level provenance
     if (activePackage.title !== updated.title) {
-      (pkgCopy as any).provenance = (pkgCopy as any).provenance || {};
-      (pkgCopy as any).provenance.fields = (pkgCopy as any).provenance.fields || {};
-      (pkgCopy as any).provenance.fields['title'] = 'TEACHER_EDITED';
+      pkgCopy.provenance = pkgCopy.provenance || {};
+      const provRec = pkgCopy.provenance as Record<string, unknown>;
+      provRec.fields = provRec.fields || {};
+      (provRec.fields as Record<string, string>)['title'] = 'TEACHER_EDITED';
     }
     // Detect changed instruments
-    pkgCopy.instruments.forEach((inst: any) => {
+    pkgCopy.instruments.forEach((inst) => {
       const oldInst = activePackage.instruments.find((i) => i.id === inst.id);
       if (oldInst) {
-        inst.provenance = JSON.parse(JSON.stringify((oldInst as any).provenance || {}));
+        const instRec = inst as AssessmentInstrument & Record<string, unknown>;
+        const oldInstRec = oldInst as AssessmentInstrument & Record<string, unknown>;
+        instRec.provenance = JSON.parse(JSON.stringify(oldInstRec.provenance || {}));
         const primitiveFields = [
           'title',
           'task',
@@ -207,42 +212,47 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
           'responseScheme',
         ];
         primitiveFields.forEach((f) => {
-          if (inst[f] !== (oldInst as any)[f]) {
-            inst.provenance = inst.provenance || {};
-            inst.provenance.fields = inst.provenance.fields || {};
-            inst.provenance.fields[f] = 'TEACHER_EDITED';
+          if (instRec[f] !== oldInstRec[f]) {
+            instRec.provenance = instRec.provenance || {};
+            const provRec = instRec.provenance as Record<string, unknown>;
+            provRec.fields = provRec.fields || {};
+            (provRec.fields as Record<string, string>)[f] = 'TEACHER_EDITED';
           }
         });
         const objectOrArrayFields = ['evidenceRequirements', 'items', 'aspects'];
         objectOrArrayFields.forEach((f) => {
-          if (JSON.stringify(inst[f]) !== JSON.stringify((oldInst as any)[f])) {
-            inst.provenance = inst.provenance || {};
-            inst.provenance.fields = inst.provenance.fields || {};
-            inst.provenance.fields[f] = 'TEACHER_EDITED';
+          if (JSON.stringify(instRec[f]) !== JSON.stringify(oldInstRec[f])) {
+            instRec.provenance = instRec.provenance || {};
+            const provRec = instRec.provenance as Record<string, unknown>;
+            provRec.fields = provRec.fields || {};
+            (provRec.fields as Record<string, string>)[f] = 'TEACHER_EDITED';
           }
         });
         // If it's a written instrument, check written items too
         if (inst.type === 'WRITTEN_TEST') {
-          const wr = inst as WrittenAssessmentInstrument;
+          const wr = inst;
           const oldWr = oldInst as WrittenAssessmentInstrument;
-          wr.items?.forEach((item: any) => {
+          wr.items?.forEach((item) => {
             const oldItem = oldWr.items?.find((oi) => oi.id === item.id);
             if (oldItem) {
-              item.provenance = JSON.parse(JSON.stringify((oldItem as any).provenance || {}));
+              item.provenance = JSON.parse(JSON.stringify((oldItem as Record<string, unknown>).provenance || {}));
               if (item.prompt !== oldItem.prompt) {
                 item.provenance = item.provenance || {};
-                item.provenance.fields = item.provenance.fields || {};
-                item.provenance.fields['prompt'] = 'TEACHER_EDITED';
+                const provRec = item.provenance as Record<string, unknown>;
+                provRec.fields = provRec.fields || {};
+                (provRec.fields as Record<string, string>)['prompt'] = 'TEACHER_EDITED';
               }
               if (JSON.stringify(item.options) !== JSON.stringify(oldItem.options)) {
                 item.provenance = item.provenance || {};
-                item.provenance.fields = item.provenance.fields || {};
-                item.provenance.fields['options'] = 'TEACHER_EDITED';
+                const provRec = item.provenance as Record<string, unknown>;
+                provRec.fields = provRec.fields || {};
+                (provRec.fields as Record<string, string>)['options'] = 'TEACHER_EDITED';
               }
               if (item.stimulus !== oldItem.stimulus) {
                 item.provenance = item.provenance || {};
-                item.provenance.fields = item.provenance.fields || {};
-                item.provenance.fields['stimulus'] = 'TEACHER_EDITED';
+                const provRec = item.provenance as Record<string, unknown>;
+                provRec.fields = provRec.fields || {};
+                (provRec.fields as Record<string, string>)['stimulus'] = 'TEACHER_EDITED';
               }
             }
           });
@@ -250,46 +260,55 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
       }
     });
     // Detect changed rubrics
-    pkgCopy.rubrics.forEach((rub: any) => {
+    pkgCopy.rubrics.forEach((rub) => {
       const oldRub = activePackage.rubrics.find((r) => r.id === rub.id);
       if (oldRub) {
-        rub.provenance = JSON.parse(JSON.stringify((oldRub as any).provenance || {}));
+        const rubRec = rub as AssessmentRubric & Record<string, unknown>;
+        const oldRubRec = oldRub as AssessmentRubric & Record<string, unknown>;
+        rubRec.provenance = JSON.parse(JSON.stringify(oldRubRec.provenance || {}));
         const fieldsToCheck = ['title', 'criteria', 'scale'];
         fieldsToCheck.forEach((f) => {
-          if (JSON.stringify(rub[f]) !== JSON.stringify((oldRub as any)[f])) {
-            rub.provenance = rub.provenance || {};
-            rub.provenance.fields = rub.provenance.fields || {};
-            rub.provenance.fields[f] = 'TEACHER_EDITED';
+          if (JSON.stringify(rubRec[f]) !== JSON.stringify(oldRubRec[f])) {
+            rubRec.provenance = rubRec.provenance || {};
+            const provRec = rubRec.provenance as Record<string, unknown>;
+            provRec.fields = provRec.fields || {};
+            (provRec.fields as Record<string, string>)[f] = 'TEACHER_EDITED';
           }
         });
       }
     });
     // Detect changed blueprintItems
-    pkgCopy.blueprintItems.forEach((bp: any) => {
+    pkgCopy.blueprintItems.forEach((bp) => {
       const oldBp = activePackage.blueprintItems.find((b) => b.id === bp.id);
       if (oldBp) {
-        bp.provenance = JSON.parse(JSON.stringify((oldBp as any).provenance || {}));
+        const bpRec = bp as AssessmentBlueprintItem & Record<string, unknown>;
+        const oldBpRec = oldBp as AssessmentBlueprintItem & Record<string, unknown>;
+        bpRec.provenance = JSON.parse(JSON.stringify(oldBpRec.provenance || {}));
         const fieldsToCheck = ['assessmentIndicator', 'materialOrContext'];
         fieldsToCheck.forEach((f) => {
-          if (bp[f] !== (oldBp as any)[f]) {
-            bp.provenance = bp.provenance || {};
-            bp.provenance.fields = bp.provenance.fields || {};
-            bp.provenance.fields[f] = 'TEACHER_EDITED';
+          if (bpRec[f] !== oldBpRec[f]) {
+            bpRec.provenance = bpRec.provenance || {};
+            const provRec = bpRec.provenance as Record<string, unknown>;
+            provRec.fields = provRec.fields || {};
+            (provRec.fields as Record<string, string>)[f] = 'TEACHER_EDITED';
           }
         });
       }
     });
     // Detect changed answerKeys
-    pkgCopy.answerKeys.forEach((ak: any) => {
+    pkgCopy.answerKeys.forEach((ak) => {
       const oldAk = activePackage.answerKeys.find((k) => k.id === ak.id);
       if (oldAk) {
-        ak.provenance = JSON.parse(JSON.stringify((oldAk as any).provenance || {}));
+        const akRec = ak as AssessmentAnswerKey & Record<string, unknown>;
+        const oldAkRec = oldAk as AssessmentAnswerKey & Record<string, unknown>;
+        akRec.provenance = JSON.parse(JSON.stringify(oldAkRec.provenance || {}));
         const fieldsToCheck = ['value', 'answer', 'optionIds', 'matchingPairs', 'categoryAnswers'];
         fieldsToCheck.forEach((f) => {
-          if (JSON.stringify(ak[f]) !== JSON.stringify((oldAk as any)[f])) {
-            ak.provenance = ak.provenance || {};
-            ak.provenance.fields = ak.provenance.fields || {};
-            ak.provenance.fields[f] = 'TEACHER_EDITED';
+          if (JSON.stringify(akRec[f]) !== JSON.stringify(oldAkRec[f])) {
+            akRec.provenance = akRec.provenance || {};
+            const provRec = akRec.provenance as Record<string, unknown>;
+            provRec.fields = provRec.fields || {};
+            (provRec.fields as Record<string, string>)[f] = 'TEACHER_EDITED';
           }
         });
       }
@@ -1037,7 +1056,7 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
                                     ))
                                   : k13Analysis?.items?.map((item) => (
                                       <option key={item.id} value={item.id}>
-                                        [{item.kdCode || item.code || ''}] {(item.kdDisplay || item.materiPokok || (item as any).kdStatement || '').slice(0, 60)}...
+                                        [{item.kdCode || item.code || ''}] {(item.kdDisplay || item.materiPokok || (item as typeof item & { kdStatement?: string }).kdStatement || '').slice(0, 60)}...
                                       </option>
                                     ))}
                               </select>
@@ -1181,7 +1200,7 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
                                     value={item.itemType}
                                     onChange={(e) => {
                                       const updatedItems = writtenInst!.items.map((it) =>
-                                        it.id === item.id ? { ...it, itemType: e.target.value as any } : it
+                                        it.id === item.id ? { ...it, itemType: e.target.value as WrittenAssessmentItemType } : it
                                       );
                                       const updatedInstruments = activePackage.instruments.map((inst) =>
                                         inst.type === 'WRITTEN_TEST' ? { ...writtenInst!, items: updatedItems } : inst
@@ -1254,7 +1273,7 @@ export const AssessmentPackageBuilder: React.FC<AssessmentPackageBuilderProps> =
                                     onChange={(e) => {
                                       const val = e.target.value;
                                       const updatedItems = writtenInst!.items.map((it) =>
-                                        it.id === item.id ? { ...it, responseMode: val ? (val as any) : undefined } : it
+                                        it.id === item.id ? { ...it, responseMode: val ? (val as ShortAnswerResponseMode) : undefined } : it
                                       );
                                       const updatedInstruments = activePackage.instruments.map((inst) =>
                                         inst.type === 'WRITTEN_TEST' ? { ...writtenInst!, items: updatedItems } : inst

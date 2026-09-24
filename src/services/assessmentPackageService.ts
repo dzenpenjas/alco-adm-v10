@@ -1007,6 +1007,11 @@ export function validateAssessmentPackage(
   (pkg.scoringGuides || []).forEach((guide, guideIdx) => {
     const guideName = guide.title && guide.title.trim() !== '' ? `"${guide.title}"` : `#${guideIdx + 1}`;
 
+    // 0. ID check
+    if (!guide.id || guide.id.trim() === '') {
+      errors.push(`Pedoman penskoran #${guideIdx + 1} belum memiliki id canonical.`);
+    }
+
     // A. Title check
     if (!guide.title || guide.title.trim() === '') {
       errors.push(`Pedoman penskoran #${guideIdx + 1} belum memiliki judul.`);

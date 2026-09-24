@@ -4,6 +4,7 @@ import { validateAssessmentPackage } from '../src/services/assessmentPackageServ
 import type {
   AssessmentPackage,
   WrittenAssessmentInstrument,
+  OralAssessmentInstrument,
   AcademicSetting,
   AssessmentPlan,
   TPData,
@@ -79,53 +80,39 @@ function createBasePackage(): AssessmentPackage {
   const instId = 'inst-written-1';
   const itemId = 'item-mc-1';
 
+  const inst: WrittenAssessmentInstrument = {
+    id: instId,
+    type: 'WRITTEN_TEST',
+    title: 'Tes Tertulis Utama',
+    items: [
+      {
+        id: itemId,
+        itemType: 'MULTIPLE_CHOICE',
+        prompt: 'Siapa penemu bola basket?',
+        options: [
+          { id: 'opt-a', label: 'A', text: 'James Naismith' },
+          { id: 'opt-b', label: 'B', text: 'William G. Morgan' },
+        ],
+        order: 1,
+      },
+    ],
+  };
+
   return {
     id: 'pkg-b12o-test',
     assessmentPlanId: 'plan-1',
-    code: 'PKG-B12O-001',
+    academicSettingId: 'setting-1',
     title: 'Paket Asesmen B12o Test',
-    subject: 'PJOK',
-    phase: 'E',
-    grade: 'X',
-    semester: '1',
-    assessmentType: 'SUMMATIVE',
-    curriculumYear: '2024',
-    workflowStatus: 'APPROVED',
-    needsReview: false,
-    revisionCount: 0,
     blueprintItems: [
       {
         id: 'bp-1',
         objectiveRefId: 'tp-1',
-        element: 'Keterampilan Gerak',
-        learningObjective: 'Siswa mampu mendemonstrasikan teknik dasar basket',
-        material: 'Bola Basket',
-        indicator: 'Disajikan narasi, siswa memilih jawaban benar',
-        cognitiveLevel: 'L2',
-        itemType: 'MULTIPLE_CHOICE',
-        itemCount: 1,
-        weight: 100,
         instrumentType: 'WRITTEN_TEST',
+        instrumentItemIds: [itemId],
+        order: 1,
       },
     ],
-    instruments: [
-      {
-        id: instId,
-        type: 'WRITTEN_TEST',
-        title: 'Tes Tertulis Utama',
-        items: [
-          {
-            id: itemId,
-            itemType: 'MULTIPLE_CHOICE',
-            prompt: 'Siapa penemu bola basket?',
-            options: [
-              { id: 'opt-a', label: 'A', text: 'James Naismith' },
-              { id: 'opt-b', label: 'B', text: 'William G. Morgan' },
-            ],
-          },
-        ],
-      } as WrittenAssessmentInstrument,
-    ],
+    instruments: [inst],
     answerKeys: [
       {
         id: 'ak-1',
@@ -135,8 +122,13 @@ function createBasePackage(): AssessmentPackage {
         optionIds: ['opt-a'],
       },
     ],
-    rubrics: [],
     scoringGuides: [],
+    rubrics: [],
+    workflowStatus: 'DRAFT',
+    needsReview: false,
+    revision: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -150,6 +142,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan teknik dasar memegang bola basket!',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -180,6 +173,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan teknik dasar memegang bola basket!',
+    order: 2,
   });
   pkg.scoringGuides.push({
     id: 'sg-essay-1',
@@ -203,6 +197,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -233,6 +228,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -263,6 +259,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -293,6 +290,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -314,6 +312,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -344,6 +343,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -374,6 +374,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -404,6 +405,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -434,6 +436,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -464,6 +467,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -494,6 +498,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -524,6 +529,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -554,6 +560,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -584,6 +591,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -614,6 +622,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -640,13 +649,13 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
 {
   const pkg = createBasePackage();
   const inst1 = pkg.instruments[0] as WrittenAssessmentInstrument;
-  const inst2 = {
+  const inst2: OralAssessmentInstrument = {
     id: 'inst-oral-2',
     type: 'ORAL_TEST',
     title: 'Tes Lisan Tambahan',
-    items: [{ id: 'oral-item-1', prompt: 'Pertanyaan lisan?' }],
+    items: [{ id: 'oral-item-1', prompt: 'Pertanyaan lisan?', order: 1 }],
   };
-  pkg.instruments.push(inst2 as any);
+  pkg.instruments.push(inst2);
 
   pkg.scoringGuides.push({
     id: 'sg-essay-1',
@@ -670,6 +679,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-essay-1',
     itemType: 'ESSAY',
     prompt: 'Jelaskan...',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-essay-1',
@@ -718,6 +728,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-sa-1',
     itemType: 'SHORT_ANSWER',
     prompt: 'Tahun berapa Indonesia merdeka?',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-sa-1',
@@ -739,6 +750,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-sa-1',
     itemType: 'SHORT_ANSWER',
     prompt: 'Ibu kota Indonesia?',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-sa-1',
@@ -760,6 +772,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-sa-1',
     itemType: 'SHORT_ANSWER',
     prompt: 'Tahun berapa Indonesia merdeka?',
+    order: 2,
   });
 
   const res = validateAssessmentPackage(pkg, mockContext);
@@ -774,6 +787,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-sa-1',
     itemType: 'SHORT_ANSWER',
     prompt: 'Tahun berapa Indonesia merdeka?',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-sa-1',
@@ -795,6 +809,7 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
     id: 'item-sa-1',
     itemType: 'SHORT_ANSWER',
     prompt: 'Tahun berapa Indonesia merdeka?',
+    order: 2,
   });
   pkg.answerKeys.push({
     id: 'ak-sa-1',
@@ -921,11 +936,47 @@ console.log('=== RUNNING B.1.2o SCORING GUIDE & ESSAY INTEGRITY REGRESSION TESTS
 
 // 34. Strict Typing Check across modified codebase (verifying zero type escapes in B.1.2o changes)
 {
-  const svcCode = fs.readFileSync(path.resolve('src/services/assessmentPackageService.ts'), 'utf-8');
-  const sgSection = svcCode.slice(svcCode.indexOf('Structural Validation of AssessmentScoringGuides'));
-  const hasEscapeInSgService = sgSection.includes('as any') || sgSection.includes('@ts-ignore') || sgSection.includes('@ts-expect-error');
+  const filesToCheck = [
+    'scripts/testB12oScoringGuideEssayIntegrityRegression.ts',
+    'src/services/assessmentPackageService.ts',
+    'src/components/administration/AssessmentPackageBuilder.tsx',
+  ];
 
-  assert(!hasEscapeInSgService, 'Test 34: Zero type escapes in B.1.2o scoring guide service validation');
+  const forbiddenPatterns = [
+    ['as', 'any'].join(' '),
+    ['as', 'unknown', 'as'].join(' '),
+    ['@ts', 'ignore'].join('-'),
+    ['@ts', 'expect-error'].join('-'),
+  ];
+
+  let foundEscape = false;
+  filesToCheck.forEach((filePath) => {
+    const fullPath = path.resolve(filePath);
+    if (!fs.existsSync(fullPath)) return;
+    const code = fs.readFileSync(fullPath, 'utf-8');
+    for (const pattern of forbiddenPatterns) {
+      if (code.includes(pattern)) {
+        foundEscape = true;
+        console.error(`Forbidden type escape "${pattern}" found in ${filePath}`);
+        break;
+      }
+    }
+  });
+
+  assert(!foundEscape, 'Test 34: Zero type escapes across regression test, service, and component files');
+}
+
+// 35. ScoringGuide with empty id fails validation
+{
+  const pkg = createBasePackage();
+  pkg.scoringGuides.push({
+    id: '',
+    title: 'Pedoman Penskoran Tanpa ID',
+    guideType: 'MANUAL',
+  });
+
+  const res = validateAssessmentPackage(pkg, mockContext);
+  assert(!res.valid && res.errors.some(e => e.includes('belum memiliki id canonical')), 'Test 35: ScoringGuide with empty id fails validation');
 }
 
 console.log(`\n=== TEST SUMMARY: ${passed} PASSED, ${failed} FAILED ===`);
