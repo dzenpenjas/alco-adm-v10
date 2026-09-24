@@ -574,7 +574,7 @@ export function buildNormalizedAssessmentDocumentModel(
           instrumentType: '',
         },
       ]
-    : snapshot.blueprintItems.map((bp, idx) => {
+    : snapshot.blueprintItems.map((bp) => {
         const obj = snapshot.resolvedObjectives[bp.objectiveRefId];
         let tpText = bp.objectiveRefId || '-';
         if (obj) {
@@ -588,7 +588,7 @@ export function buildNormalizedAssessmentDocumentModel(
         }
 
         return {
-          no: bp.order || idx + 1,
+          no: bp.order,
           tpCodeAndStatement: tpText,
           indicator: bp.assessmentIndicator || '-',
           material: bp.materialOrContext || '-',
@@ -610,8 +610,8 @@ export function buildNormalizedAssessmentDocumentModel(
 
         switch (inst.type) {
           case 'WRITTEN_TEST': {
-            base.writtenItems = (inst.items || []).map((item, idx) => ({
-              no: item.order || idx + 1,
+            base.writtenItems = (inst.items || []).map((item) => ({
+              no: item.order,
               prompt: item.prompt,
               stimulus: item.stimulus,
               itemType: item.itemType,
@@ -623,8 +623,8 @@ export function buildNormalizedAssessmentDocumentModel(
             break;
           }
           case 'ORAL_TEST': {
-            base.oralItems = (inst.items || []).map((item, idx) => ({
-              no: item.order || idx + 1,
+            base.oralItems = (inst.items || []).map((item) => ({
+              no: item.order,
               prompt: item.prompt,
               expectedResponse: item.expectedResponse,
             }));

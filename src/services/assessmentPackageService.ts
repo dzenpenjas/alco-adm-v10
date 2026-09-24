@@ -263,6 +263,21 @@ export function validateAssessmentPackage(
   if (!pkg.blueprintItems || pkg.blueprintItems.length === 0) {
     errors.push('Kisi-kisi asesmen (blueprint) wajib diisi. Perangkat Asesmen tanpa kisi-kisi tidak dapat berstatus SIAP.');
   } else {
+    const seenBlueprintOrders = new Set<number>();
+    pkg.blueprintItems.forEach((bp, idx) => {
+      if (!Number.isInteger(bp.order) || bp.order <= 0) {
+        errors.push(
+          `Butir kisi-kisi #${idx + 1} memiliki order canonical tidak valid [${bp.order}].`
+        );
+      } else if (seenBlueprintOrders.has(bp.order)) {
+        errors.push(
+          `Terdapat duplicate order canonical pada kisi-kisi [${bp.order}].`
+        );
+      } else {
+        seenBlueprintOrders.add(bp.order);
+      }
+    });
+
     const curType = getExplicitCurriculumType(context.academicSetting);
 
     if (curType === 'UNRESOLVED') {
@@ -406,7 +421,20 @@ export function validateAssessmentPackage(
         if (!written.items || written.items.length === 0) {
           errors.push('Tes Tertulis wajib memiliki minimal 1 butir soal.');
         } else {
+          const seenWrittenOrders = new Set<number>();
           written.items.forEach((item, itemIdx) => {
+            if (!Number.isInteger(item.order) || item.order <= 0) {
+              errors.push(
+                `Soal tertulis #${itemIdx + 1} memiliki order canonical tidak valid [${item.order}].`
+              );
+            } else if (seenWrittenOrders.has(item.order)) {
+              errors.push(
+                `Terdapat duplicate order canonical pada tes tertulis [${item.order}].`
+              );
+            } else {
+              seenWrittenOrders.add(item.order);
+            }
+
             if (!item.itemType || (item.itemType as string) === '') {
               errors.push(`Soal tertulis #${itemIdx + 1} belum menentukan jenis soal (itemType unresolved).`);
             }
@@ -769,7 +797,20 @@ export function validateAssessmentPackage(
         if (!oral.items || oral.items.length === 0) {
           errors.push('Tes Lisan wajib memiliki minimal 1 pertanyaan lisan.');
         } else {
+          const seenOralOrders = new Set<number>();
           oral.items.forEach((item, itemIdx) => {
+            if (!Number.isInteger(item.order) || item.order <= 0) {
+              errors.push(
+                `Pertanyaan tes lisan #${itemIdx + 1} memiliki order canonical tidak valid [${item.order}].`
+              );
+            } else if (seenOralOrders.has(item.order)) {
+              errors.push(
+                `Terdapat duplicate order canonical pada tes lisan [${item.order}].`
+              );
+            } else {
+              seenOralOrders.add(item.order);
+            }
+
             if (!item.prompt || item.prompt.trim() === '') {
               errors.push(`Pertanyaan tes lisan #${itemIdx + 1} belum memiliki teks pertanyaan.`);
             }
