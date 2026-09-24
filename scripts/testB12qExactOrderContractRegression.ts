@@ -475,6 +475,7 @@ console.log('\n--- 5. Export Model Normalization Tests ---');
     packageTitle: pkg.title,
     schoolName: 'SD Test',
     teacherName: 'Guru Test',
+    principalName: 'Kepala Sekolah',
     academicYear: '2025/2026',
     semester: '1 (Ganjil)',
     grade: 'Kelas 10',
@@ -517,6 +518,7 @@ console.log('\n--- 5. Export Model Normalization Tests ---');
     packageTitle: pkg.title,
     schoolName: 'SD Test',
     teacherName: 'Guru Test',
+    principalName: 'Kepala Sekolah',
     academicYear: '2025/2026',
     semester: '1 (Ganjil)',
     grade: 'Kelas 10',
@@ -557,6 +559,7 @@ console.log('\n--- 5. Export Model Normalization Tests ---');
     packageTitle: pkg.title,
     schoolName: 'SD Test',
     teacherName: 'Guru Test',
+    principalName: 'Kepala Sekolah',
     academicYear: '2025/2026',
     semester: '1 (Ganjil)',
     grade: 'Kelas 10',
@@ -596,6 +599,7 @@ console.log('\n--- 5. Export Model Normalization Tests ---');
     packageTitle: pkg.title,
     schoolName: 'SD Test',
     teacherName: 'Guru Test',
+    principalName: 'Kepala Sekolah',
     academicYear: '2025/2026',
     semester: '1 (Ganjil)',
     grade: 'Kelas 10',
@@ -758,6 +762,7 @@ console.log('\n--- 7. Rubric Scale Level Order Tests ---');
     packageTitle: pkg.title,
     schoolName: 'SD Test',
     teacherName: 'Guru Test',
+    principalName: 'Kepala Sekolah',
     academicYear: '2025/2026',
     semester: '1 (Ganjil)',
     grade: 'Kelas 10',
@@ -778,15 +783,34 @@ console.log('\n--- 7. Rubric Scale Level Order Tests ---');
   assert(normRubric.scale[0].label === 'Rendah' && normRubric.scale[1].label === 'Tinggi', 'Test 36: Export rubric scale correctly sorted by a.order - b.order');
 }
 
-// Test 37: Zero `as any` in assessmentExportService.ts
+// Test 37: Full forbidden type escape scan across services and regression script
 {
-  const exportServiceCode = fs.readFileSync(
-    path.join(process.cwd(), 'src/services/documentEngine/assessmentExportService.ts'),
-    'utf-8'
-  );
-  const asAnyMatches = exportServiceCode.match(/\bas\s+any\b/g);
-  const count = asAnyMatches ? asAnyMatches.length : 0;
-  assert(count === 0, 'Test 37: assessmentExportService.ts has strictly 0 "as any" usages');
+  const forbiddenPatterns = [
+    ['as', 'any'].join(' '),
+    ['as', 'unknown', 'as'].join(' '),
+    ['@ts', 'ignore'].join('-'),
+    ['@ts', 'expect-error'].join('-'),
+  ];
+
+  const filesToCheck = [
+    'src/services/assessmentPackageService.ts',
+    'src/services/documentEngine/assessmentExportService.ts',
+    'scripts/testB12qExactOrderContractRegression.ts',
+  ];
+
+  filesToCheck.forEach((relativePath) => {
+    const code = fs.readFileSync(
+      path.join(process.cwd(), relativePath),
+      'utf8'
+    );
+
+    forbiddenPatterns.forEach((pattern) => {
+      assert(
+        !code.includes(pattern),
+        `Test 37: ${relativePath} contains no forbidden type escape [${pattern}]`
+      );
+    });
+  });
 }
 
 // Test 38: Preservation of B.1.2n canonical option key label resolution
@@ -812,6 +836,7 @@ console.log('\n--- 7. Rubric Scale Level Order Tests ---');
     packageTitle: pkg.title,
     schoolName: 'SD Test',
     teacherName: 'Guru Test',
+    principalName: 'Kepala Sekolah',
     academicYear: '2025/2026',
     semester: '1 (Ganjil)',
     grade: 'Kelas 10',
@@ -830,6 +855,42 @@ console.log('\n--- 7. Rubric Scale Level Order Tests ---');
   const model = buildNormalizedAssessmentDocumentModel(snapshot);
   const mcAk = model.answerKeys.list.find((ak) => ak.answerType === 'OPTION');
   assert(mcAk?.value === 'B', 'Test 38: Preserves B.1.2n exact linked option.label resolution (value = "B")');
+}
+
+// Test 39: Preservation of B.1.2o ESSAY ScoringGuide integrity
+{
+  const pkg = createValidBasePackage();
+
+  // Verify ESSAY answer key is present with EXPECTED_RESPONSE
+  const essayAnswerKey = pkg.answerKeys.find(
+    (ak) => ak.instrumentItemId === 'item-essay-1'
+  );
+
+  assert(
+    essayAnswerKey?.answerType === 'EXPECTED_RESPONSE',
+    'Test 39: Canonical ESSAY EXPECTED_RESPONSE remains present'
+  );
+
+  // Remove ONLY ESSAY scoring guide
+  pkg.scoringGuides = pkg.scoringGuides.filter(
+    (sg) => sg.instrumentItemId !== 'item-essay-1'
+  );
+
+  const res = validateAssessmentPackage(pkg, mockContext);
+
+  assert(
+    !res.valid,
+    'Test 39: B.1.2o ESSAY without canonical ScoringGuide fails validation'
+  );
+
+  assert(
+    res.errors.some(
+      (e) =>
+        e.includes('pedoman penskoran canonical yang valid') ||
+        e.includes('Pedoman penskoran')
+    ),
+    'Test 39: B.1.2o missing ESSAY ScoringGuide produces exact validation error'
+  );
 }
 
 console.log(`\n=== SUMMARY: ${passed} passed, ${failed} failed ===`);
