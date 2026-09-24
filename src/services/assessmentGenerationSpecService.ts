@@ -348,45 +348,55 @@ export function resolveAssessmentGenerationSpec(
   }
 
   // 10. Pemetaan Rekomendasi Bukti (Evidence Mapping) & Pengecekan Keselarasan Instrumen
-  const evidenceRecommendations = resolvedObjectives.map((obj) => {
-    // Cari kriteria pertama yang berelasi jika ada
-    const relatedCrit = resolvedCriteria.find((c) => c.objectiveRefId === obj.id);
-
-    const rec = mapObjectiveToEvidence({
-      objective: obj,
-      criterion: relatedCrit,
-      subjectProfile,
-      generationProfile,
-      plannedInstrumentTypes,
-    });
-
-    // Pengecekan koherensi dengan AssessmentPlan kanonikal:
-    // CANONICAL PLAN MUST WIN! Rekomendasi tidak boleh merubah plannedInstrumentTypes di plan.
-    // Jika rekomendasi kosong karena ambigu, JANGAN membuat mismatch palsu (hanya EVIDENCE_RECOMMENDATION_AMBIGUOUS).
-    const hasRecommendations = rec.recommendedInstrumentTypes.length > 0;
-    const isCoherent = hasRecommendations && rec.recommendedInstrumentTypes.some((recInst) =>
-      plannedInstrumentTypes.includes(recInst)
+  const evidenceRecommendations = resolvedObjectives.flatMap((obj) => {
+    const relatedCriteria = resolvedCriteria.filter(
+      (c) => c.objectiveRefId === obj.id
     );
 
-    if (hasRecommendations && !isCoherent && plannedInstrumentTypes.length > 0) {
-      issues.push({
-        code: 'INSTRUMENT_RECOMMENDATION_MISMATCH',
-        severity: 'REVIEW',
-        message: `Rekomendasi instrumen (${rec.recommendedInstrumentTypes.join(', ')}) untuk kompetensi "${obj.text.slice(0, 50)}..." berbeda dari instrumen rencana (${plannedInstrumentTypes.join(', ')}). Rencana Asesmen guru tetap dipertahankan.`,
-        objectiveRefId: obj.id,
-      });
-    }
+    const targets: (ResolvedAssessmentCriterion | undefined)[] =
+      relatedCriteria.length > 0
+        ? relatedCriteria
+        : [undefined];
 
-    if (rec.confidence === 'NEEDS_TEACHER_REVIEW') {
-      issues.push({
-        code: 'EVIDENCE_RECOMMENDATION_AMBIGUOUS',
-        severity: 'REVIEW',
-        message: `Rekomendasi bukti untuk tujuan pembelajaran ID "${obj.id}" memerlukan telaah/konfirmasi oleh guru.`,
-        objectiveRefId: obj.id,
+    return targets.map((criterion) => {
+      const rec = mapObjectiveToEvidence({
+        objective: obj,
+        criterion,
+        subjectProfile,
+        generationProfile,
+        plannedInstrumentTypes,
       });
-    }
 
-    return rec;
+      // Pengecekan koherensi dengan AssessmentPlan kanonikal:
+      // CANONICAL PLAN MUST WIN! Rekomendasi tidak boleh merubah plannedInstrumentTypes di plan.
+      // Jika rekomendasi kosong karena ambigu, JANGAN membuat mismatch palsu (hanya EVIDENCE_RECOMMENDATION_AMBIGUOUS).
+      const hasRecommendations = rec.recommendedInstrumentTypes.length > 0;
+      const isCoherent = hasRecommendations && rec.recommendedInstrumentTypes.some((recInst) =>
+        plannedInstrumentTypes.includes(recInst)
+      );
+
+      if (hasRecommendations && !isCoherent && plannedInstrumentTypes.length > 0) {
+        issues.push({
+          code: 'INSTRUMENT_RECOMMENDATION_MISMATCH',
+          severity: 'REVIEW',
+          message: `Rekomendasi instrumen (${rec.recommendedInstrumentTypes.join(', ')}) untuk kompetensi "${obj.text.slice(0, 50)}..." berbeda dari instrumen rencana (${plannedInstrumentTypes.join(', ')}). Rencana Asesmen guru tetap dipertahankan.`,
+          objectiveRefId: obj.id,
+          criterionId: criterion?.id,
+        });
+      }
+
+      if (rec.confidence === 'NEEDS_TEACHER_REVIEW') {
+        issues.push({
+          code: 'EVIDENCE_RECOMMENDATION_AMBIGUOUS',
+          severity: 'REVIEW',
+          message: `Rekomendasi bukti untuk tujuan pembelajaran ID "${obj.id}" memerlukan telaah/konfirmasi oleh guru.`,
+          objectiveRefId: obj.id,
+          criterionId: criterion?.id,
+        });
+      }
+
+      return rec;
+    });
   });
 
   // 11. Konteks Sumber (Source Context) - Hanya sumber nyata/kanonikal guru
