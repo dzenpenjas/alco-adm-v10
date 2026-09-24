@@ -130,14 +130,13 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {model.kisiKisi.rows.map((row) => (
-                    <tr key={row.no} className="hover:bg-slate-50/50">
+                    <tr key={`kisikisi-${row.no}`} className="hover:bg-slate-50/50">
                       <td className="p-2 text-center font-semibold text-slate-600">{row.no}</td>
                       <td className="p-2">
-                        <div className="font-semibold text-slate-800">{row.tpCode || ''}</div>
-                        <div className="text-slate-600">{row.tpStatement}</div>
+                        <div className="text-slate-800">{row.tpCodeAndStatement}</div>
                       </td>
                       <td className="p-2 text-slate-700">{row.indicator}</td>
-                      <td className="p-2 text-slate-700">{row.materialContext || '-'}</td>
+                      <td className="p-2 text-slate-700">{row.material || '-'}</td>
                       <td className="p-2 text-slate-700 font-medium">{row.instrumentType}</td>
                     </tr>
                   ))}
@@ -159,10 +158,10 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
               <div key={inst.id} className="p-4 rounded border border-slate-200 bg-slate-50/60 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                   <h4 className="text-xs font-bold uppercase tracking-wide text-slate-800">
-                    Instrumen {instIdx + 1}: {inst.title || inst.type}
+                    Instrumen {instIdx + 1}: {inst.title || inst.typeLabel || inst.type}
                   </h4>
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                    {inst.type}
+                    {inst.typeLabel || inst.type}
                   </span>
                 </div>
 
@@ -171,21 +170,21 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
                   <div className="space-y-4">
                     {inst.writtenItems && inst.writtenItems.length > 0 ? (
                       inst.writtenItems.map((item) => (
-                        <div key={item.id} className="space-y-2 p-3 bg-white border border-slate-200 rounded">
+                        <div key={`written-${inst.id}-${item.no}`} className="space-y-2 p-3 bg-white border border-slate-200 rounded">
                           {item.stimulus && (
                             <div className="p-2 bg-slate-50 border-l-2 border-slate-400 text-xs italic text-slate-700">
                               {item.stimulus}
                             </div>
                           )}
                           <div className="flex items-start gap-2">
-                            <span className="font-bold text-xs text-slate-700">{item.itemNumber}.</span>
+                            <span className="font-bold text-xs text-slate-700">{item.no}.</span>
                             <div className="text-xs text-slate-800 flex-1">{item.prompt}</div>
                           </div>
                           {item.options && item.options.length > 0 && (
                             <div className="pl-6 space-y-1">
-                              {item.options.map((opt) => (
-                                <div key={opt.key} className="text-xs text-slate-700 flex items-start gap-2">
-                                  <span className="font-semibold text-slate-600">{opt.key}.</span>
+                              {item.options.map((opt, optIdx) => (
+                                <div key={`written-${inst.id}-${item.no}-${opt.label || optIdx}`} className="text-xs text-slate-700 flex items-start gap-2">
+                                  <span className="font-semibold text-slate-600">{opt.label}.</span>
                                   <span>{opt.text}</span>
                                 </div>
                               ))}
@@ -208,10 +207,10 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
                       </div>
                     )}
                     {inst.oralItems && inst.oralItems.length > 0 ? (
-                      inst.oralItems.map((item, oIdx) => (
-                        <div key={item.id} className="p-3 bg-white border border-slate-200 rounded space-y-1">
+                      inst.oralItems.map((item) => (
+                        <div key={`oral-${inst.id}-${item.no}`} className="p-3 bg-white border border-slate-200 rounded space-y-1">
                           <div className="flex items-start gap-2 text-xs">
-                            <span className="font-bold text-slate-700">#{oIdx + 1}</span>
+                            <span className="font-bold text-slate-700">#{item.no}</span>
                             <div className="flex-1">
                               <span className="font-semibold text-slate-800">Pertanyaan:</span> {item.prompt}
                             </div>
@@ -243,12 +242,12 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
                         <span className="font-semibold">Petunjuk Pelaksanaan:</span> {inst.instructions}
                       </div>
                     )}
-                    {inst.aspects && inst.aspects.length > 0 && (
+                    {inst.performanceAspects && inst.performanceAspects.length > 0 && (
                       <div className="space-y-1.5 pt-1">
                         <span className="text-xs font-bold text-slate-700 block">Aspek Penilaian:</span>
                         <div className="grid grid-cols-1 gap-2">
-                          {inst.aspects.map((asp, aIdx) => (
-                            <div key={asp.id} className="p-2 bg-white border border-slate-200 rounded text-xs">
+                          {inst.performanceAspects.map((asp, aIdx) => (
+                            <div key={`perf-aspect-${inst.id}-${aIdx}`} className="p-2 bg-white border border-slate-200 rounded text-xs">
                               <div className="flex items-center justify-between font-semibold text-slate-800">
                                 <span>{aIdx + 1}. {asp.label}</span>
                                 {asp.weight !== undefined && (
@@ -284,7 +283,7 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
                         <span className="text-xs font-bold text-slate-700 block">Aspek Observasi:</span>
                         <div className="grid grid-cols-1 gap-2">
                           {inst.observationAspects.map((asp, oIdx) => (
-                            <div key={asp.id} className="p-2 bg-white border border-slate-200 rounded text-xs">
+                            <div key={`obs-aspect-${inst.id}-${oIdx}`} className="p-2 bg-white border border-slate-200 rounded text-xs">
                               <span className="font-semibold text-slate-800 block">{oIdx + 1}. {asp.label}</span>
                               {asp.indicator && (
                                 <p className="text-slate-600 mt-0.5"><span className="font-medium text-slate-500">Indikator:</span> {asp.indicator}</p>
@@ -365,7 +364,7 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
                       {inst.evidenceRequirements && inst.evidenceRequirements.length > 0 ? (
                         <ul className="list-disc pl-5 space-y-1 text-slate-700">
                           {inst.evidenceRequirements.map((req, rIdx) => (
-                            <li key={rIdx}>{req}</li>
+                            <li key={`portfolio-req-${inst.id}-${rIdx}`}>{req}</li>
                           ))}
                         </ul>
                       ) : (
@@ -386,9 +385,9 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
                     {inst.selfPeerItems && inst.selfPeerItems.length > 0 ? (
                       <div className="space-y-1.5">
                         <span className="text-xs font-bold text-slate-700 block">Daftar Pernyataan Refleksi / Penilaian:</span>
-                        {inst.selfPeerItems.map((item, spIdx) => (
-                          <div key={item.id} className="p-2.5 bg-white border border-slate-200 rounded text-xs flex items-start gap-2">
-                            <span className="font-bold text-slate-600">{spIdx + 1}.</span>
+                        {inst.selfPeerItems.map((item) => (
+                          <div key={`self-peer-${inst.id}-${item.no}`} className="p-2.5 bg-white border border-slate-200 rounded text-xs flex items-start gap-2">
+                            <span className="font-bold text-slate-600">{item.no}.</span>
                             <div className="flex-1">
                               <p className="text-slate-800">{item.statement}</p>
                               {item.category && (
@@ -418,26 +417,29 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
           {model.answerKeys.list.length === 0 ? (
             <p className="text-xs text-slate-400 italic">Tidak ada kunci jawaban terpisah.</p>
           ) : (
-            <div className="space-y-3">
-              {model.answerKeys.list.map((ak) => (
-                <div key={ak.id} className="p-3 bg-slate-50 border border-slate-200 rounded space-y-2 text-xs">
-                  <div className="font-bold text-slate-800">
-                    Kunci Jawaban: {ak.title || ak.instrumentId}
-                  </div>
-                  {ak.keys && ak.keys.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                      {ak.keys.map((k, kIdx) => (
-                        <div key={k.itemId || kIdx} className="p-1.5 bg-white border border-slate-200 rounded flex justify-between">
-                          <span className="font-semibold text-slate-600">No. {k.itemNumber || kIdx + 1}</span>
-                          <span className="font-bold text-blue-700">{k.key || '-'}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-slate-400 italic">Belum ada rincian kunci.</p>
-                  )}
-                </div>
-              ))}
+            <div className="overflow-x-auto border border-slate-200 rounded">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                    <th className="p-2 w-16 text-center">No. Butir</th>
+                    <th className="p-2 w-36">Tipe Kunci</th>
+                    <th className="p-2">Kunci Jawaban</th>
+                    <th className="p-2">Keterangan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {model.answerKeys.list.map((ak, akIdx) => (
+                    <tr key={`ak-${ak.itemNumber ?? akIdx}`} className="hover:bg-slate-50/50">
+                      <td className="p-2 text-center font-semibold text-slate-600">
+                        {ak.itemNumber ?? akIdx + 1}
+                      </td>
+                      <td className="p-2 text-slate-700">{ak.answerType}</td>
+                      <td className="p-2 font-semibold text-blue-700">{ak.value || '-'}</td>
+                      <td className="p-2 text-slate-600">{ak.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -451,8 +453,8 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
             <p className="text-xs text-slate-400 italic">Belum ada pedoman penskoran.</p>
           ) : (
             <div className="space-y-3">
-              {model.scoringGuides.list.map((guide) => (
-                <div key={guide.id} className="p-3 bg-slate-50 border border-slate-200 rounded space-y-2 text-xs">
+              {model.scoringGuides.list.map((guide, guideIdx) => (
+                <div key={`scoring-guide-${guideIdx}-${guide.title}`} className="p-3 bg-slate-50 border border-slate-200 rounded space-y-2 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-800">{guide.title}</span>
                     <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-mono">
@@ -483,47 +485,82 @@ export const AssessmentDocumentPreview: React.FC<AssessmentDocumentPreviewProps>
             <p className="text-xs text-slate-400 italic">Belum ada rubrik penilaian.</p>
           ) : (
             <div className="space-y-4">
-              {model.rubrics.list.map((rub) => (
-                <div key={rub.id} className="p-4 bg-slate-50 border border-slate-200 rounded space-y-3 text-xs">
+              {model.rubrics.list.map((rub, rubIdx) => (
+                <div key={`rubric-${rubIdx}-${rub.title}`} className="p-4 bg-slate-50 border border-slate-200 rounded space-y-3 text-xs">
                   <div className="font-bold text-slate-800 text-sm">{rub.title}</div>
-                  {rub.criteria && rub.criteria.length > 0 && (
-                    <div className="space-y-2">
-                      <span className="font-semibold text-slate-700 block">Kriteria Penilaian:</span>
-                      <div className="space-y-1.5">
-                        {rub.criteria.map((crit, cIdx) => (
-                          <div key={crit.id} className="p-2 bg-white border border-slate-200 rounded">
-                            <div className="flex justify-between font-semibold text-slate-800">
-                              <span>{cIdx + 1}. {crit.label}</span>
-                              {crit.weight !== undefined && (
-                                <span className="text-slate-500 font-normal">Bobot: {crit.weight}</span>
-                              )}
-                            </div>
-                            {crit.indicator && (
-                              <p className="text-slate-600 mt-0.5"><span className="font-medium text-slate-500">Indikator:</span> {crit.indicator}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                  {rub.scale && rub.scale.length > 0 && rub.criteria && rub.criteria.length > 0 ? (
+                    <div className="overflow-x-auto border border-slate-200 rounded">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                            <th className="p-2 w-1/3">Kriteria</th>
+                            {rub.scale.map((sc, scIdx) => (
+                              <th key={`scale-head-${rubIdx}-${scIdx}`} className="p-2 text-center">
+                                <div>{sc.label}</div>
+                                {sc.score !== undefined && (
+                                  <div className="text-[10px] font-normal text-slate-500">({sc.score})</div>
+                                )}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                          {rub.criteria.map((crit, critIdx) => (
+                            <tr key={`criterion-${rubIdx}-${critIdx}`} className="hover:bg-slate-50/50">
+                              <td className="p-2 font-semibold text-slate-800 align-top">
+                                <div>{critIdx + 1}. {crit.label}</div>
+                                {crit.weight !== undefined && (
+                                  <span className="text-[10px] text-slate-500 font-normal">Bobot: {crit.weight}</span>
+                                )}
+                              </td>
+                              {rub.scale.map((_, sIdx) => (
+                                <td key={`desc-${rubIdx}-${critIdx}-${sIdx}`} className="p-2 text-slate-600 align-top text-[11px]">
+                                  {crit.descriptors && crit.descriptors[sIdx] ? crit.descriptors[sIdx] : '-'}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-
-                  {rub.scale && rub.scale.length > 0 && (
-                    <div className="space-y-2 pt-2 border-t border-slate-200">
-                      <span className="font-semibold text-slate-700 block">Skala Penilaian:</span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
-                        {rub.scale.map((sc) => (
-                          <div key={sc.id} className="p-2 bg-white border border-slate-200 rounded">
-                            <div className="font-semibold text-slate-800 flex justify-between">
-                              <span>{sc.label}</span>
-                              {sc.score !== undefined && <span className="text-blue-600">({sc.score})</span>}
-                            </div>
-                            {sc.descriptor && (
-                              <p className="text-slate-600 text-[11px] mt-1">{sc.descriptor}</p>
-                            )}
+                  ) : (
+                    <>
+                      {rub.criteria && rub.criteria.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="font-semibold text-slate-700 block">Kriteria Penilaian:</span>
+                          <div className="space-y-1.5">
+                            {rub.criteria.map((crit, critIdx) => (
+                              <div key={`criterion-${rubIdx}-${critIdx}`} className="p-2 bg-white border border-slate-200 rounded">
+                                <div className="flex justify-between font-semibold text-slate-800">
+                                  <span>{critIdx + 1}. {crit.label}</span>
+                                  {crit.weight !== undefined && (
+                                    <span className="text-slate-500 font-normal">Bobot: {crit.weight}</span>
+                                  )}
+                                </div>
+                                {crit.descriptors && crit.descriptors.length > 0 && (
+                                  <p className="text-slate-600 mt-0.5 text-[11px]">{crit.descriptors.join('; ')}</p>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
+                        </div>
+                      )}
+                      {rub.scale && rub.scale.length > 0 && (
+                        <div className="space-y-2 pt-2 border-t border-slate-200">
+                          <span className="font-semibold text-slate-700 block">Skala Penilaian:</span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
+                            {rub.scale.map((sc, scIdx) => (
+                              <div key={`scale-${rubIdx}-${scIdx}`} className="p-2 bg-white border border-slate-200 rounded">
+                                <div className="font-semibold text-slate-800 flex justify-between">
+                                  <span>{sc.label}</span>
+                                  {sc.score !== undefined && <span className="text-blue-600">({sc.score})</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ))}
