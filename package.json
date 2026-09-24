@@ -29,7 +29,8 @@
     "test:regulatory2026": "tsx scripts/testAudit2026RegulatoryCompatibility.ts",
     "test:b12m": "tsx scripts/testB12mAnswerKeyExactItemNumberRegression.ts",
     "test:b12n": "tsx scripts/testB12nCanonicalAnswerKeySsotRegression.ts",
-    "test:b12o": "tsx scripts/testB12oScoringGuideEssayIntegrityRegression.ts"
+    "test:b12o": "tsx scripts/testB12oScoringGuideEssayIntegrityRegression.ts",
+    "test:b12p": "tsx scripts/testB12pCanonicalIdentityScopeIntegrityRegression.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

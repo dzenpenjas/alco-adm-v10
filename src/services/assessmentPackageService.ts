@@ -95,6 +95,30 @@ export function validateAssessmentPackage(
   const errors: string[] = [];
   const warnings: string[] = [];
 
+  // 0. Scope & Context Integrity Validation
+  if (!pkg.academicSettingId || pkg.academicSettingId.trim() === '') {
+    errors.push('Perangkat Asesmen tidak memiliki academicSettingId.');
+  } else {
+    if (context.academicSetting && pkg.academicSettingId !== context.academicSetting.id) {
+      errors.push(
+        `academicSettingId Perangkat Asesmen [${pkg.academicSettingId}] tidak cocok dengan konteks AcademicSetting [${context.academicSetting.id}].`
+      );
+    }
+    if (context.assessmentPlan && pkg.academicSettingId !== context.assessmentPlan.academicSettingId) {
+      errors.push(
+        `academicSettingId Perangkat Asesmen [${pkg.academicSettingId}] tidak cocok dengan Rencana Asesmen induk [${context.assessmentPlan.academicSettingId}].`
+      );
+    }
+  }
+
+  if (pkg.workspaceId) {
+    if (context.assessmentPlan?.workspaceId && pkg.workspaceId !== context.assessmentPlan.workspaceId) {
+      errors.push(
+        `workspaceId Perangkat Asesmen [${pkg.workspaceId}] tidak cocok dengan Rencana Asesmen induk [${context.assessmentPlan.workspaceId}].`
+      );
+    }
+  }
+
   // 1. Title Check
   if (!pkg.title || pkg.title.trim() === '') {
     errors.push('Judul Perangkat Asesmen wajib diisi.');
@@ -132,6 +156,108 @@ export function validateAssessmentPackage(
       }
     });
   }
+
+  // Build canonical instrumentMap and allItemLookup with Fail-Closed Uniqueness Checks
+  const seenInstrumentIds = new Set<string>();
+  const instrumentMap = new Map<string, AssessmentInstrument>();
+
+  (pkg.instruments || []).forEach((inst, idx) => {
+    if (!inst.id || inst.id.trim() === '') {
+      errors.push(`Instrumen #${idx + 1} belum memiliki id canonical.`);
+      return;
+    }
+    if (seenInstrumentIds.has(inst.id)) {
+      errors.push(`Terdapat duplicate instrument.id canonical [${inst.id}].`);
+    } else {
+      seenInstrumentIds.add(inst.id);
+      instrumentMap.set(inst.id, inst);
+    }
+  });
+
+  const seenItemIds = new Set<string>();
+  const allItemLookup = new Map<
+    string,
+    {
+      instrumentId: string;
+      instrumentType: string;
+      itemType?: string;
+      options?: WrittenAssessmentOption[];
+      matchingPremises?: MatchingAssessmentEntry[];
+      matchingResponses?: MatchingAssessmentEntry[];
+      categoryResponseStatements?: CategoryResponseStatement[];
+      categoryResponseCategories?: CategoryResponseCategory[];
+    }
+  >();
+
+  (pkg.instruments || []).forEach((inst) => {
+    if (!inst.id) return;
+
+    const processItem = (
+      itemId: string | undefined,
+      itemType: string | undefined,
+      itemIdx: number,
+      extraProps: {
+        options?: WrittenAssessmentOption[];
+        matchingPremises?: MatchingAssessmentEntry[];
+        matchingResponses?: MatchingAssessmentEntry[];
+        categoryResponseStatements?: CategoryResponseStatement[];
+        categoryResponseCategories?: CategoryResponseCategory[];
+      } = {}
+    ) => {
+      if (!itemId || itemId.trim() === '') {
+        errors.push(`Butir instrumen #${itemIdx + 1} pada instrumen [${inst.id}] belum memiliki id canonical.`);
+        return;
+      }
+      if (seenItemIds.has(itemId)) {
+        errors.push(`Terdapat duplicate canonical instrument item id [${itemId}].`);
+      } else {
+        seenItemIds.add(itemId);
+        allItemLookup.set(itemId, {
+          instrumentId: inst.id,
+          instrumentType: inst.type,
+          itemType,
+          ...extraProps,
+        });
+      }
+    };
+
+    switch (inst.type) {
+      case 'WRITTEN_TEST':
+        (inst as WrittenAssessmentInstrument).items?.forEach((it, idx) => {
+          processItem(it.id, it.itemType, idx, {
+            options: it.options,
+            matchingPremises: it.matchingPremises,
+            matchingResponses: it.matchingResponses,
+            categoryResponseStatements: it.categoryResponseStatements,
+            categoryResponseCategories: it.categoryResponseCategories,
+          });
+        });
+        break;
+      case 'ORAL_TEST':
+        (inst as OralAssessmentInstrument).items?.forEach((it, idx) => {
+          processItem(it.id, undefined, idx);
+        });
+        break;
+      case 'PERFORMANCE':
+        (inst as PerformanceAssessmentInstrument).aspects?.forEach((asp, idx) => {
+          processItem(asp.id, undefined, idx);
+        });
+        break;
+      case 'OBSERVATION':
+        (inst as ObservationAssessmentInstrument).aspects?.forEach((asp, idx) => {
+          processItem(asp.id, undefined, idx);
+        });
+        break;
+      case 'SELF_ASSESSMENT':
+      case 'PEER_ASSESSMENT':
+        (inst as SelfPeerAssessmentInstrument).items?.forEach((it, idx) => {
+          processItem(it.id, undefined, idx);
+        });
+        break;
+      default:
+        break;
+    }
+  });
 
   // 3. Objective Source Verification for Blueprint (Kisi-Kisi) - Mandatory & Fail-Closed
   if (!pkg.blueprintItems || pkg.blueprintItems.length === 0) {
@@ -176,43 +302,8 @@ export function validateAssessmentPackage(
     }
 
     // Blueprint -> Instrument Item Linkage Mapping
-    const itemToInstrumentType = new Map<string, string>();
     const packageInstrumentTypes = new Set<string>();
-
-    pkg.instruments.forEach((inst) => {
-      packageInstrumentTypes.add(inst.type);
-      switch (inst.type) {
-        case 'WRITTEN_TEST':
-          (inst as WrittenAssessmentInstrument).items?.forEach((it) => {
-            itemToInstrumentType.set(it.id, 'WRITTEN_TEST');
-          });
-          break;
-        case 'ORAL_TEST':
-          (inst as OralAssessmentInstrument).items?.forEach((it) => {
-            itemToInstrumentType.set(it.id, 'ORAL_TEST');
-          });
-          break;
-        case 'PERFORMANCE':
-          (inst as PerformanceAssessmentInstrument).aspects?.forEach((asp) => {
-            itemToInstrumentType.set(asp.id, 'PERFORMANCE');
-          });
-          break;
-        case 'OBSERVATION':
-          (inst as ObservationAssessmentInstrument).aspects?.forEach((asp) => {
-            itemToInstrumentType.set(asp.id, 'OBSERVATION');
-          });
-          break;
-        case 'SELF_ASSESSMENT':
-        case 'PEER_ASSESSMENT':
-          (inst as SelfPeerAssessmentInstrument).items?.forEach((it) => {
-            itemToInstrumentType.set(it.id, inst.type);
-          });
-          break;
-        default:
-          itemToInstrumentType.set(inst.id, inst.type);
-          break;
-      }
-    });
+    pkg.instruments.forEach((inst) => packageInstrumentTypes.add(inst.type));
 
     pkg.blueprintItems.forEach((bp, idx) => {
       // Instrument type check
@@ -227,14 +318,14 @@ export function validateAssessmentPackage(
       // instrumentItemIds check
       if (bp.instrumentItemIds && bp.instrumentItemIds.length > 0) {
         bp.instrumentItemIds.forEach((itemId) => {
-          const foundType = itemToInstrumentType.get(itemId);
-          if (!foundType) {
+          const itemMeta = allItemLookup.get(itemId);
+          if (!itemMeta) {
             errors.push(
               `Butir kisi-kisi #${idx + 1} merujuk pada instrumentItemId [${itemId}] yang tidak ditemukan (dangling reference).`
             );
-          } else if (bp.instrumentType && foundType !== bp.instrumentType) {
+          } else if (bp.instrumentType && itemMeta.instrumentType !== bp.instrumentType) {
             errors.push(
-              `Butir kisi-kisi #${idx + 1} (${bp.instrumentType}) merujuk pada instrumentItemId [${itemId}] yang bertipe "${foundType}" (cross-instrument-type reference).`
+              `Butir kisi-kisi #${idx + 1} (${bp.instrumentType}) merujuk pada instrumentItemId [${itemId}] yang bertipe "${itemMeta.instrumentType}" (cross-instrument-type reference).`
             );
           }
         });
@@ -286,65 +377,6 @@ export function validateAssessmentPackage(
       }
     });
   }
-
-  // Build canonical instrumentMap and allItemLookup
-  const instrumentMap = new Map<string, AssessmentInstrument>();
-  const allItemLookup = new Map<
-    string,
-    {
-      instrumentId: string;
-      instrumentType: string;
-      itemType?: string;
-      options?: WrittenAssessmentOption[];
-      matchingPremises?: MatchingAssessmentEntry[];
-      matchingResponses?: MatchingAssessmentEntry[];
-      categoryResponseStatements?: CategoryResponseStatement[];
-      categoryResponseCategories?: CategoryResponseCategory[];
-    }
-  >();
-
-  (pkg.instruments || []).forEach((inst) => {
-    instrumentMap.set(inst.id, inst);
-    switch (inst.type) {
-      case 'WRITTEN_TEST':
-        (inst as WrittenAssessmentInstrument).items?.forEach((it) => {
-          allItemLookup.set(it.id, {
-            instrumentId: inst.id,
-            instrumentType: 'WRITTEN_TEST',
-            itemType: it.itemType,
-            options: it.options,
-            matchingPremises: it.matchingPremises,
-            matchingResponses: it.matchingResponses,
-            categoryResponseStatements: it.categoryResponseStatements,
-            categoryResponseCategories: it.categoryResponseCategories,
-          });
-        });
-        break;
-      case 'ORAL_TEST':
-        (inst as OralAssessmentInstrument).items?.forEach((it) => {
-          allItemLookup.set(it.id, { instrumentId: inst.id, instrumentType: 'ORAL_TEST' });
-        });
-        break;
-      case 'PERFORMANCE':
-        (inst as PerformanceAssessmentInstrument).aspects?.forEach((asp) => {
-          allItemLookup.set(asp.id, { instrumentId: inst.id, instrumentType: 'PERFORMANCE' });
-        });
-        break;
-      case 'OBSERVATION':
-        (inst as ObservationAssessmentInstrument).aspects?.forEach((asp) => {
-          allItemLookup.set(asp.id, { instrumentId: inst.id, instrumentType: 'OBSERVATION' });
-        });
-        break;
-      case 'SELF_ASSESSMENT':
-      case 'PEER_ASSESSMENT':
-        (inst as SelfPeerAssessmentInstrument).items?.forEach((it) => {
-          allItemLookup.set(it.id, { instrumentId: inst.id, instrumentType: inst.type });
-        });
-        break;
-      default:
-        break;
-    }
-  });
 
   // 4. Instrument-Specific Validation
   const validRubricIds = new Set((pkg.rubrics || []).map((r) => r.id));
@@ -817,9 +849,19 @@ export function validateAssessmentPackage(
   });
 
   // 5. Answer Keys Referential Integrity (Fail Closed)
+  const seenAnswerKeyIds = new Set<string>();
   const seenAnswerKeyTargets = new Set<string>();
 
-  pkg.answerKeys.forEach((ak, akIdx) => {
+  (pkg.answerKeys || []).forEach((ak, akIdx) => {
+    // AnswerKey ID uniqueness
+    if (!ak.id || ak.id.trim() === '') {
+      errors.push(`Kunci jawaban #${akIdx + 1} belum memiliki id canonical.`);
+    } else if (seenAnswerKeyIds.has(ak.id)) {
+      errors.push(`Terdapat duplicate AssessmentAnswerKey.id canonical [${ak.id}].`);
+    } else {
+      seenAnswerKeyIds.add(ak.id);
+    }
+
     // 0. Duplicate AnswerKey guard (1 instrumentId + 1 instrumentItemId = max 1 key)
     if (ak.instrumentId && ak.instrumentItemId) {
       const targetKey = `${ak.instrumentId}::${ak.instrumentItemId}`;
@@ -972,44 +1014,76 @@ export function validateAssessmentPackage(
   });
 
   // 6. Rubrics Structure Integrity (No default levels/descriptors fabricated if empty!)
-  pkg.rubrics.forEach((rub, rubIdx) => {
+  const seenRubricIds = new Set<string>();
+
+  (pkg.rubrics || []).forEach((rub, rubIdx) => {
+    const rubName = rub.title && rub.title.trim() !== '' ? `"${rub.title}"` : `#${rubIdx + 1}`;
+
+    if (!rub.id || rub.id.trim() === '') {
+      errors.push(`Rubrik #${rubIdx + 1} belum memiliki id canonical.`);
+    } else if (seenRubricIds.has(rub.id)) {
+      errors.push(`Terdapat duplicate AssessmentRubric.id canonical [${rub.id}].`);
+    } else {
+      seenRubricIds.add(rub.id);
+    }
+
     if (!rub.title || rub.title.trim() === '') {
       errors.push(`Rubrik #${rubIdx + 1} belum memiliki judul.`);
     }
     if (!rub.criteria || rub.criteria.length === 0) {
-      errors.push(`Rubrik "${rub.title || '#' + (rubIdx + 1)}" wajib memiliki minimal 1 kriteria.`);
+      errors.push(`Rubrik ${rubName} wajib memiliki minimal 1 kriteria.`);
     } else {
       rub.criteria.forEach((crit, cIdx) => {
         if (!crit.label || crit.label.trim() === '') {
-          errors.push(`Kriteria #${cIdx + 1} pada rubrik "${rub.title || '#' + (rubIdx + 1)}" belum memiliki label.`);
+          errors.push(`Kriteria #${cIdx + 1} pada rubrik ${rubName} belum memiliki label.`);
         }
       });
     }
     if (!rub.scale || rub.scale.length === 0) {
-      errors.push(`Rubrik "${rub.title || '#' + (rubIdx + 1)}" wajib memiliki minimal 1 tingkat skala penilaian.`);
+      errors.push(`Rubrik ${rubName} wajib memiliki minimal 1 tingkat skala penilaian.`);
     } else {
       rub.scale.forEach((sc, sIdx) => {
         if (!sc.label || sc.label.trim() === '') {
-          errors.push(`Tingkat skala #${sIdx + 1} pada rubrik "${rub.title || '#' + (rubIdx + 1)}" belum memiliki label.`);
+          errors.push(`Tingkat skala #${sIdx + 1} pada rubrik ${rubName} belum memiliki label.`);
         }
       });
     }
 
-    if (rub.instrumentId && !instrumentMap.has(rub.instrumentId)) {
-      errors.push(`Rubrik "${rub.title}" merujuk pada instrumentId [${rub.instrumentId}] yang tidak ditemukan.`);
+    if (rub.instrumentItemId && (!rub.instrumentId || rub.instrumentId.trim() === '')) {
+      errors.push(
+        `Rubrik ${rubName} memiliki instrumentItemId [${rub.instrumentItemId}] tanpa instrumentId.`
+      );
     }
-    if (rub.instrumentItemId && !allItemLookup.has(rub.instrumentItemId)) {
-      errors.push(`Rubrik "${rub.title}" merujuk pada instrumentItemId [${rub.instrumentItemId}] yang tidak ditemukan.`);
+
+    if (rub.instrumentId && rub.instrumentId.trim() !== '') {
+      if (!instrumentMap.has(rub.instrumentId)) {
+        errors.push(`Rubrik ${rubName} merujuk pada instrumentId [${rub.instrumentId}] yang tidak ditemukan.`);
+      }
+    }
+
+    if (rub.instrumentItemId && rub.instrumentItemId.trim() !== '') {
+      const itemMeta = allItemLookup.get(rub.instrumentItemId);
+      if (!itemMeta) {
+        errors.push(`Rubrik ${rubName} merujuk pada instrumentItemId [${rub.instrumentItemId}] yang tidak ditemukan.`);
+      } else if (rub.instrumentId && itemMeta.instrumentId !== rub.instrumentId) {
+        errors.push(`Rubrik ${rubName} merujuk item [${rub.instrumentItemId}] milik instrumen lain.`);
+      }
     }
   });
 
   // 7. Structural Validation of AssessmentScoringGuides as Canonical Entities
+  const seenScoringGuideIds = new Set<string>();
+
   (pkg.scoringGuides || []).forEach((guide, guideIdx) => {
     const guideName = guide.title && guide.title.trim() !== '' ? `"${guide.title}"` : `#${guideIdx + 1}`;
 
     // 0. ID check
     if (!guide.id || guide.id.trim() === '') {
       errors.push(`Pedoman penskoran #${guideIdx + 1} belum memiliki id canonical.`);
+    } else if (seenScoringGuideIds.has(guide.id)) {
+      errors.push(`Terdapat duplicate AssessmentScoringGuide.id canonical [${guide.id}].`);
+    } else {
+      seenScoringGuideIds.add(guide.id);
     }
 
     // A. Title check
