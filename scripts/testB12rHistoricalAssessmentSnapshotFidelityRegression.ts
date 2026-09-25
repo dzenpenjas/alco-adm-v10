@@ -22,6 +22,7 @@ import type {
   AssessmentDocumentSnapshot,
   CanonicalAssessmentDocumentSnapshot,
   WrittenAssessmentInstrument,
+  DocumentSnapshot,
 } from '../src/types';
 import type { DocumentGenerationContext } from '../src/services/documentEngine/types';
 
@@ -430,11 +431,11 @@ async function runRegression() {
           {
             id: 'atp-item-1',
             tpId: 'tp-1',
-            sequenceNumber: 1,
-            allocatedHours: 4,
+            stepNumber: 1,
+            allocatedJP: 4,
             semester: 1,
             p3Dimensions: ['Mandiri'],
-            assessmentPlans: 'Tes Tertulis',
+            assessmentPlan: 'Tes Tertulis',
           },
         ],
         updatedAt: '2026-09-24T00:00:00.000Z',
@@ -566,6 +567,110 @@ async function runRegression() {
     const snap = docxResult.snapshot as CanonicalAssessmentDocumentSnapshot;
     assert.strictEqual(snap.assessmentPackageRevision, 2);
     assert.ok(docxResult.fileName.includes('Rev2'), `Expected filename to include Rev2, got: ${docxResult.fileName}`);
+  });
+
+  // ----------------------------------------------------
+  // TEST 19 — LIVE ASESMEN WITHOUT SNAPSHOT AND WITHOUT LIVE PACKAGE FAILS CLOSED
+  // ----------------------------------------------------
+  await test('TEST 19: Live ASESMEN without historical snapshot and without live package must fail closed', async () => {
+    const { context } = createBaseFixture();
+    const liveContext: DocumentGenerationContext = {
+      ...context,
+      snapshot: undefined,
+      assessmentPackages: [],
+      activeAssessmentPackageId: undefined,
+    };
+
+    let threw = false;
+    try {
+      await generateDocument('ASESMEN', liveContext);
+    } catch {
+      threw = true;
+    }
+
+    assert.strictEqual(
+      threw,
+      true,
+      'TEST 19: Live ASESMEN without historical snapshot and without live package must fail closed'
+    );
+  });
+
+  // ----------------------------------------------------
+  // TEST 20 — GENERIC SNAPSHOT DOES NOT BYPASS ASSESSMENT ELIGIBILITY
+  // ----------------------------------------------------
+  await test('TEST 20: Generic DocumentSnapshot without canonical ASESMEN type does not bypass eligibility', async () => {
+    const { context } = createBaseFixture();
+    const genericSnapshot: DocumentSnapshot = {
+      schoolName: context.school.name,
+      teacherName: context.profile.name,
+      principalName: context.school.principalName || '',
+      academicYear: context.academicSetting.academicYear,
+      semester: context.academicSetting.semester,
+      subject: context.academicSetting.subject,
+      grade: context.academicSetting.grade,
+      generatedAt: '2026-09-24T00:00:00.000Z',
+      documentDate: '2026-09-24',
+      formattedDocumentDate: '24 September 2026',
+    };
+
+    const contextWithGenericSnapshot: DocumentGenerationContext = {
+      ...context,
+      snapshot: genericSnapshot,
+      assessmentPackages: [],
+      activeAssessmentPackageId: undefined,
+    };
+
+    let threw = false;
+    try {
+      await generateDocument('ASESMEN', contextWithGenericSnapshot);
+    } catch {
+      threw = true;
+    }
+
+    assert.strictEqual(
+      threw,
+      true,
+      'TEST 20: Generic DocumentSnapshot must fail closed for ASESMEN generation when live package is missing'
+    );
+  });
+
+  // ----------------------------------------------------
+  // TEST 21 — GENERIC SNAPSHOT FORMATTED PDF FAILS CLOSED
+  // ----------------------------------------------------
+  await test('TEST 21: Generic DocumentSnapshot fails closed on generateDocumentFormatted("ASESMEN", "pdf")', async () => {
+    const { context } = createBaseFixture();
+    const genericSnapshot: DocumentSnapshot = {
+      schoolName: context.school.name,
+      teacherName: context.profile.name,
+      principalName: context.school.principalName || '',
+      academicYear: context.academicSetting.academicYear,
+      semester: context.academicSetting.semester,
+      subject: context.academicSetting.subject,
+      grade: context.academicSetting.grade,
+      generatedAt: '2026-09-24T00:00:00.000Z',
+      documentDate: '2026-09-24',
+      formattedDocumentDate: '24 September 2026',
+    };
+
+    const contextWithGenericSnapshot: DocumentGenerationContext = {
+      ...context,
+      snapshot: genericSnapshot,
+      assessmentPackages: [],
+      activeAssessmentPackageId: undefined,
+    };
+
+    let threw = false;
+    try {
+      await generateDocumentFormatted('ASESMEN', contextWithGenericSnapshot, 'pdf');
+    } catch {
+      threw = true;
+    }
+
+    assert.strictEqual(
+      threw,
+      true,
+      'TEST 21: Generic DocumentSnapshot must fail closed on generateDocumentFormatted for ASESMEN'
+    );
   });
 
   // ----------------------------------------------------
