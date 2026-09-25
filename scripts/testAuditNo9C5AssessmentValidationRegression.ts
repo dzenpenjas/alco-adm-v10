@@ -52,11 +52,14 @@ const mockValidationContext: AssessmentPackageValidationContext = {
   },
   assessmentPlan: {
     id: 'plan-valid-1',
+    academicSettingId: 'setting-1',
     title: 'Rencana Asesmen Biologi',
     workflowStatus: 'SIAP',
     instruments: [{ type: 'WRITTEN_TEST' }],
   } as any,
   tp: {
+    id: 'tp-data-1',
+    academicSettingId: 'setting-1',
     workflowStatus: 'SIAP',
     items: [
       { id: 'tp-1', text: 'Memahami ekosistem' },
@@ -64,7 +67,7 @@ const mockValidationContext: AssessmentPackageValidationContext = {
     ],
   } as any,
   assessmentCriteria: [
-    { id: 'crit-1', text: 'Kriteria 1', workflowStatus: 'SIAP' },
+    { id: 'crit-1', text: 'Kriteria 1', workflowStatus: 'SIAP', academicSettingId: 'setting-1' },
   ] as any,
 };
 
@@ -1412,7 +1415,6 @@ async function runAll60Tests() {
               id: 'item-oral-1',
               prompt: 'Sebutkan bagian-bagian sel!',
               blueprintItemId: 'bp-oral-1',
-              coverageUnitId: 'cu-oral-1',
               order: 1,
             },
           ],
