@@ -372,6 +372,22 @@ function createCanonicalAssessmentSnapshotFromPackage(
 }
 
 /**
+ * Type guard for canonical or blank AssessmentDocumentSnapshot.
+ */
+export function isAssessmentDocumentSnapshot(
+  snapshot: unknown
+): snapshot is AssessmentDocumentSnapshot {
+  return Boolean(
+    snapshot &&
+      typeof snapshot === 'object' &&
+      'documentType' in snapshot &&
+      snapshot.documentType === 'ASESMEN' &&
+      'mode' in snapshot &&
+      (snapshot.mode === 'CANONICAL_PACKAGE' || snapshot.mode === 'BLANK_TEMPLATE')
+  );
+}
+
+/**
  * Creates an immutable AssessmentDocumentSnapshot.
  * This snapshot is completely self-contained. Renderers MUST consume this snapshot
  * rather than live application state.
@@ -380,6 +396,10 @@ export function createAssessmentDocumentSnapshot(
   context: DocumentGenerationContext,
   options?: AssessmentExportOptions
 ): AssessmentDocumentSnapshot {
+  if (isAssessmentDocumentSnapshot(context.snapshot)) {
+    return JSON.parse(JSON.stringify(context.snapshot)) as AssessmentDocumentSnapshot;
+  }
+
   const isBlankMode = (options?.documentMode || context.documentMode) === 'blank';
 
   const school = context.school || ({} as SchoolData);

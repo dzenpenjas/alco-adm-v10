@@ -128,8 +128,26 @@ function createValidPackage(overrides?: Partial<AssessmentPackage>): AssessmentP
         ],
       },
     ],
-    answerKeys: [],
-    scoringGuides: [],
+    answerKeys: [
+      {
+        id: 'ak-q1',
+        instrumentId: 'inst-1',
+        instrumentItemId: 'q1',
+        answerType: 'EXPECTED_RESPONSE',
+        value: 'Pemanasan membantu mempersiapkan tubuh sebelum aktivitas fisik.',
+      },
+    ],
+    scoringGuides: [
+      {
+        id: 'sg-q1',
+        title: 'Pedoman Penskoran Soal 1',
+        guideType: 'ESSAY',
+        instructions: 'Nilai berdasarkan ketepatan dan kelengkapan jawaban.',
+        maxScore: 10,
+        instrumentId: 'inst-1',
+        instrumentItemId: 'q1',
+      },
+    ],
     rubrics: [],
     workflowStatus: 'DRAFT',
     needsReview: true,

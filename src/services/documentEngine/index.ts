@@ -533,8 +533,10 @@ export async function generateDocument(
   }
 
   if (result.record) {
-    result.record.snapshot = snapshot;
-    result.record.lastGenerated = snapshot.generatedAt;
+    if (type !== 'ASESMEN' || !result.record.snapshot) {
+      result.record.snapshot = snapshot;
+      result.record.lastGenerated = snapshot.generatedAt;
+    }
   }
   return result;
 }
@@ -557,17 +559,18 @@ export async function generateDocumentFormatted(
 
   if (format === 'pdf') {
     const pdfRes = await generatePdfDocument(type, context);
+    const finalSnapshot = (type === 'ASESMEN' && pdfRes.snapshot ? pdfRes.snapshot : snapshot);
     const record: AppDocumentRecord = {
       id: `doc-${type.toLowerCase()}-${context.workspace?.id || 'ws'}-${Date.now()}`,
       type,
       title: pdfRes.title,
       status: 'completed',
       format: 'pdf',
-      lastGenerated: snapshot.generatedAt,
+      lastGenerated: finalSnapshot.generatedAt,
       fileName: pdfRes.fileName,
-      academicSettingId: context.academicSetting.id,
+      academicSettingId: context.academicSetting?.id,
       workspaceId: context.workspace?.id,
-      snapshot,
+      snapshot: finalSnapshot,
     };
 
     return {
@@ -578,21 +581,22 @@ export async function generateDocumentFormatted(
       record,
       blob: pdfRes.blob,
       format: 'pdf',
-      snapshot,
+      snapshot: finalSnapshot,
     };
   }
 
   const docxRes = await generateDocument(type, context);
+  const finalSnapshot = (type === 'ASESMEN' && docxRes.record?.snapshot ? docxRes.record.snapshot : snapshot);
   const record: AppDocumentRecord = {
     ...docxRes.record,
     format: 'docx',
-    snapshot,
+    snapshot: finalSnapshot,
   };
 
   return {
     ...docxRes,
     record,
     format: 'docx',
-    snapshot,
+    snapshot: finalSnapshot,
   };
 }
