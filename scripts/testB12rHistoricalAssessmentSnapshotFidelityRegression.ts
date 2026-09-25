@@ -432,7 +432,7 @@ async function runRegression() {
             tpId: 'tp-1',
             sequenceNumber: 1,
             allocatedHours: 4,
-            semester: '1',
+            semester: 1,
             p3Dimensions: ['Mandiri'],
             assessmentPlans: 'Tes Tertulis',
           },
@@ -449,9 +449,129 @@ async function runRegression() {
   });
 
   // ----------------------------------------------------
-  // TEST 12 — ZERO FORBIDDEN TYPE ESCAPES
+  // TEST 13 — GENERATE DOCUMENT WITH DELETED LIVE PACKAGE
   // ----------------------------------------------------
-  await test('TEST 12: Zero forbidden type escapes across modified services and regression suite', () => {
+  await test('TEST 13: generateDocument("ASESMEN") succeeds with historical snapshot when live packages are deleted', async () => {
+    const { context } = createBaseFixture();
+    const historicalSnapshot = createAssessmentDocumentSnapshot(context);
+
+    const historicalContext: DocumentGenerationContext = {
+      ...context,
+      assessmentPackages: [],
+      activeAssessmentPackageId: undefined,
+      snapshot: historicalSnapshot,
+    };
+
+    const docResult = await generateDocument('ASESMEN', historicalContext);
+    assert.ok(docResult.record, 'docResult.record must exist');
+    assert.ok(isAssessmentDocumentSnapshot(docResult.record.snapshot), 'record.snapshot must be AssessmentDocumentSnapshot');
+
+    const snap = docResult.record.snapshot as CanonicalAssessmentDocumentSnapshot;
+    assert.strictEqual(snap.assessmentPackageId, 'pkg-1');
+    assert.strictEqual(snap.assessmentPackageRevision, 1);
+  });
+
+  // ----------------------------------------------------
+  // TEST 14 — FORMATTED DOCX WITH DELETED LIVE PACKAGE
+  // ----------------------------------------------------
+  await test('TEST 14: generateDocumentFormatted("ASESMEN", "docx") succeeds with historical snapshot when live package deleted', async () => {
+    const { context } = createBaseFixture();
+    const historicalSnapshot = createAssessmentDocumentSnapshot(context);
+
+    const historicalContext: DocumentGenerationContext = {
+      ...context,
+      assessmentPackages: [],
+      activeAssessmentPackageId: undefined,
+      snapshot: historicalSnapshot,
+    };
+
+    const result = await generateDocumentFormatted('ASESMEN', historicalContext, 'docx');
+    assert.strictEqual(result.format, 'docx');
+    assert.ok(isAssessmentDocumentSnapshot(result.snapshot), 'result.snapshot must be AssessmentDocumentSnapshot');
+    assert.ok(isAssessmentDocumentSnapshot(result.record.snapshot), 'result.record.snapshot must be AssessmentDocumentSnapshot');
+
+    const snap = result.snapshot as CanonicalAssessmentDocumentSnapshot;
+    assert.strictEqual(snap.assessmentPackageId, 'pkg-1');
+  });
+
+  // ----------------------------------------------------
+  // TEST 15 — FORMATTED PDF WITH DELETED LIVE PACKAGE
+  // ----------------------------------------------------
+  await test('TEST 15: generateDocumentFormatted("ASESMEN", "pdf") succeeds with historical snapshot when live package deleted', async () => {
+    const { context } = createBaseFixture();
+    const historicalSnapshot = createAssessmentDocumentSnapshot(context);
+
+    const historicalContext: DocumentGenerationContext = {
+      ...context,
+      assessmentPackages: [],
+      activeAssessmentPackageId: undefined,
+      snapshot: historicalSnapshot,
+    };
+
+    const result = await generateDocumentFormatted('ASESMEN', historicalContext, 'pdf');
+    assert.strictEqual(result.format, 'pdf');
+    assert.ok(isAssessmentDocumentSnapshot(result.snapshot), 'result.snapshot must be AssessmentDocumentSnapshot');
+    assert.ok(isAssessmentDocumentSnapshot(result.record.snapshot), 'result.record.snapshot must be AssessmentDocumentSnapshot');
+
+    const snap = result.snapshot as CanonicalAssessmentDocumentSnapshot;
+    assert.strictEqual(snap.assessmentPackageId, 'pkg-1');
+  });
+
+  // ----------------------------------------------------
+  // TEST 16 — LIVE PACKAGE BECOMES DRAFT / NEEDS REVIEW
+  // ----------------------------------------------------
+  await test('TEST 16: Historical export unaffected when live package changes to DRAFT / needsReview=true', async () => {
+    const { context, pkg } = createBaseFixture();
+    const historicalSnapshot = createAssessmentDocumentSnapshot(context);
+
+    // Modify live package to invalid/draft state
+    pkg.workflowStatus = 'DRAFT';
+    pkg.needsReview = true;
+
+    const historicalContext: DocumentGenerationContext = {
+      ...context,
+      assessmentPackages: [pkg],
+      activeAssessmentPackageId: pkg.id,
+      snapshot: historicalSnapshot,
+    };
+
+    const docxResult = await generateDocumentFormatted('ASESMEN', historicalContext, 'docx');
+    assert.ok(docxResult.success);
+    assert.ok(isAssessmentDocumentSnapshot(docxResult.snapshot));
+
+    const pdfResult = await generateDocumentFormatted('ASESMEN', historicalContext, 'pdf');
+    assert.ok(pdfResult.success);
+    assert.ok(isAssessmentDocumentSnapshot(pdfResult.snapshot));
+  });
+
+  // ----------------------------------------------------
+  // TEST 17 — LIVE PACKAGE REVISION DRIFT
+  // ----------------------------------------------------
+  await test('TEST 17: Live package revision drift does not alter historical snapshot revision in filename/record', async () => {
+    const { context, pkg } = createBaseFixture();
+    pkg.revision = 2;
+    const historicalSnapshot = createAssessmentDocumentSnapshot(context);
+
+    // Live package increments to revision 3
+    pkg.revision = 3;
+
+    const historicalContext: DocumentGenerationContext = {
+      ...context,
+      assessmentPackages: [pkg],
+      activeAssessmentPackageId: pkg.id,
+      snapshot: historicalSnapshot,
+    };
+
+    const docxResult = await generateDocumentFormatted('ASESMEN', historicalContext, 'docx');
+    const snap = docxResult.snapshot as CanonicalAssessmentDocumentSnapshot;
+    assert.strictEqual(snap.assessmentPackageRevision, 2);
+    assert.ok(docxResult.fileName.includes('Rev2'), `Expected filename to include Rev2, got: ${docxResult.fileName}`);
+  });
+
+  // ----------------------------------------------------
+  // TEST 18 — ZERO FORBIDDEN TYPE ESCAPES
+  // ----------------------------------------------------
+  await test('TEST 18: Zero forbidden type escapes across modified services and regression suite', () => {
     const forbiddenTokens = [
       ['as', 'any'].join(' '),
       ['as', 'unknown', 'as'].join(' '),

@@ -25,7 +25,7 @@ import { PDF_THEME } from './renderers/pdf/pdfTheme';
 import { validateLearningPlan } from '../learningPlanService';
 import { isValidDocumentDate } from '../documentDateService';
 import { validateKKTPData } from '../cpWorkflowService';
-import { checkAssessmentExportEligibility } from './assessmentExportService';
+import { checkAssessmentExportEligibility, isAssessmentDocumentSnapshot } from './assessmentExportService';
 
 export * from './types';
 export * from './snapshot';
@@ -405,6 +405,10 @@ export function validateDocumentRequirements(
       }
 
       case 'ASESMEN': {
+        if (isAssessmentDocumentSnapshot(context.snapshot)) {
+          break;
+        }
+
         const eligibility = checkAssessmentExportEligibility(context);
         if (!eligibility.eligible) {
           missingFields.push(...eligibility.blockers);
